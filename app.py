@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request, render_template, redirect
 
 SPOTIFY_CLIENT_ID = 'b4e452520d914d2e8561369726f181f3'
 SPOTIFY_CLIENT_SECRET = '67d6a93badba45e7ba42d35d3b928ace'
-SPOTIFY_REDIRECT_URI = 'http://127.0.0.1:5000/callback'
+SPOTIFY_REDIRECT_URI = 'https://web-production-842c3.up.railway.app/callback'
 SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state'
 
 spotify_tokens = {}
