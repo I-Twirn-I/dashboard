@@ -120,63 +120,44 @@ def get_weather():
     if city in weather_cache and now - weather_cache[city]['time'] < 600:
         return jsonify(weather_cache[city]['data'])
     try:
-        headers = {'User-Agent': 'dashboard-app/1.0'}
+        # wttr.in API kullan
+        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
+        req = urllib.request.Request(url, headers={'User-Agent': 'dashboard-app/1.0'})
+        with urllib.request.urlopen(req, timeout=10) as res:
+            data = json.loads(res.read().decode())
 
-        # Şehirden koordinat al
-        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr"
-        geo_req = urllib.request.Request(geo_url, headers=headers)
-        with urllib.request.urlopen(geo_req, timeout=10) as res:
-            geo = json.loads(res.read().decode())
+        current = data['current_condition'][0]
+        area = data['nearest_area'][0]
+        city_name = area['areaName'][0]['value']
 
-        if not geo.get('results'):
-            return jsonify({'error': 'Şehir bulunamadı'}), 404
+        temp = int(current['temp_C'])
+        feels_like = int(current['FeelsLikeC'])
+        humidity = int(current['humidity'])
+        wind = int(current['windspeedKmph'])
+        desc_en = current['weatherDesc'][0]['value'].lower()
 
-        lat = geo['results'][0]['latitude']
-        lon = geo['results'][0]['longitude']
-        city_name = geo['results'][0]['name']
-
-        # Hava durumu al
-        weather_url = (
-            f"https://api.open-meteo.com/v1/forecast"
-            f"?latitude={lat}&longitude={lon}"
-            f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m"
-        )
-        weather_req = urllib.request.Request(weather_url, headers=headers)
-        with urllib.request.urlopen(weather_req, timeout=10) as res:
-            weather = json.loads(res.read().decode())
-
-        current = weather['current']
-
-        weather_codes = {
-            0: ('Açık', '☀️'), 1: ('Az bulutlu', '🌤️'), 2: ('Parçalı bulutlu', '⛅'),
-            3: ('Kapalı', '☁️'), 45: ('Sisli', '🌫️'), 48: ('Puslu', '🌫️'),
-            51: ('Hafif çisenti', '🌦️'), 53: ('Çisenti', '🌦️'), 55: ('Yoğun çisenti', '🌦️'),
-            61: ('Hafif yağmur', '🌧️'), 63: ('Yağmurlu', '🌧️'), 65: ('Yoğun yağmur', '🌧️'),
-            71: ('Hafif kar', '🌨️'), 73: ('Karlı', '🌨️'), 75: ('Yoğun kar', '🌨️'),
-            80: ('Sağanak', '🌧️'), 81: ('Sağanak', '🌧️'), 82: ('Yoğun sağanak', '🌧️'),
-            95: ('Gök gürültülü', '⛈️'), 96: ('Fırtına', '⛈️'), 99: ('Şiddetli fırtına', '⛈️'),
-        }
-
-        code = current['weather_code']
-        desc, icon = weather_codes.get(code, ('Bilinmiyor', '🌤️'))
-
-        if code == 0:
-            anim_type = 'sunny'
-        elif code in [61,63,65,51,53,55,80,81,82]:
-            anim_type = 'rainy'
-        elif code in [71,73,75,77]:
-            anim_type = 'snowy'
-        elif code in [95,96,99]:
-            anim_type = 'stormy'
+        # Türkçe açıklama ve ikon
+        if 'sunny' in desc_en or 'clear' in desc_en:
+            desc, icon, anim_type = 'Açık', '☀️', 'sunny'
+        elif 'rain' in desc_en or 'drizzle' in desc_en:
+            desc, icon, anim_type = 'Yağmurlu', '🌧️', 'rainy'
+        elif 'snow' in desc_en or 'sleet' in desc_en:
+            desc, icon, anim_type = 'Karlı', '🌨️', 'snowy'
+        elif 'thunder' in desc_en or 'storm' in desc_en:
+            desc, icon, anim_type = 'Fırtınalı', '⛈️', 'stormy'
+        elif 'fog' in desc_en or 'mist' in desc_en:
+            desc, icon, anim_type = 'Sisli', '🌫️', 'cloudy'
+        elif 'cloud' in desc_en or 'overcast' in desc_en:
+            desc, icon, anim_type = 'Bulutlu', '☁️', 'cloudy'
         else:
-            anim_type = 'cloudy'
+            desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
 
         result = {
             'city': city_name,
-            'temp': round(current['temperature_2m']),
-            'feels_like': round(current['apparent_temperature']),
-            'humidity': current['relative_humidity_2m'],
-            'wind': round(current['wind_speed_10m']),
+            'temp': temp,
+            'feels_like': feels_like,
+            'humidity': humidity,
+            'wind': wind,
             'desc': desc,
             'icon': icon,
             'anim_type': anim_type,
