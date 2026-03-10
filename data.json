@@ -1,0 +1,54 @@
+{
+  "todos": [
+    {
+      "id": 1,
+      "text": "Günlük yazılım",
+      "done": false
+    },
+    {
+      "id": 2,
+      "text": "Vücut Sağlığı(bir iki hareket)",
+      "done": false
+    },
+    {
+      "id": 4,
+      "text": "Almanca-ingilizce",
+      "done": false
+    },
+    {
+      "id": 5,
+      "text": "Note-pad sitesi kur",
+      "done": true
+    }
+  ],
+  "notes": "e-ticaret sitesi lazım",
+  "bookmarks": [
+    {
+      "icon": "🖤",
+      "name": "Pinterest",
+      "url": "https://tr.pinterest.com/"
+    },
+    {
+      "icon": "👑",
+      "name": "YouTube",
+      "url": "https://www.youtube.com/"
+    },
+    {
+      "icon": "📌",
+      "name": "Git Hub",
+      "url": "https://github.com/"
+    },
+    {
+      "icon": "💥",
+      "name": "G. Drive",
+      "url": "https://drive.google.com/drive/home"
+    },
+    {
+      "icon": "⚡",
+      "name": "Python",
+      "url": "https://www.w3schools.com/python/"
+    }
+  ],
+  "theme": "dark",
+  "city": "istanbul"
+}
