@@ -120,9 +120,12 @@ def get_weather():
     if city in weather_cache and now - weather_cache[city]['time'] < 600:
         return jsonify(weather_cache[city]['data'])
     try:
+        headers = {'User-Agent': 'dashboard-app/1.0'}
+
         # Şehirden koordinat al
         geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr"
-        with urllib.request.urlopen(geo_url, timeout=10) as res:
+        geo_req = urllib.request.Request(geo_url, headers=headers)
+        with urllib.request.urlopen(geo_req, timeout=10) as res:
             geo = json.loads(res.read().decode())
 
         if not geo.get('results'):
@@ -138,7 +141,8 @@ def get_weather():
             f"?latitude={lat}&longitude={lon}"
             f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m"
         )
-        with urllib.request.urlopen(weather_url, timeout=10) as res:
+        weather_req = urllib.request.Request(weather_url, headers=headers)
+        with urllib.request.urlopen(weather_req, timeout=10) as res:
             weather = json.loads(res.read().decode())
 
         current = weather['current']
