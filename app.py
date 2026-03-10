@@ -110,9 +110,15 @@ def update_city():
     save_data(data)
     return jsonify({'ok': True})
 
+weather_cache = {}
+
 @app.route('/api/weather')
 def get_weather():
     city = request.args.get('city', 'Istanbul')
+    import time
+    now = time.time()
+    if city in weather_cache and now - weather_cache[city]['time'] < 600:
+        return jsonify(weather_cache[city]['data'])
     try:
         # Şehirden koordinat al
         geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr"
@@ -161,7 +167,7 @@ def get_weather():
         else:
             anim_type = 'cloudy'
 
-        return jsonify({
+        result = {
             'city': city_name,
             'temp': round(current['temperature_2m']),
             'feels_like': round(current['apparent_temperature']),
@@ -170,7 +176,9 @@ def get_weather():
             'desc': desc,
             'icon': icon,
             'anim_type': anim_type,
-        })
+        }
+        weather_cache[city] = {'data': result, 'time': now}
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
