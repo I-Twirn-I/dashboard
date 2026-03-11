@@ -114,8 +114,12 @@ weather_cache = {}
 
 def fetch_weather_data(city):
     import time
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
     geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json"
-    with urllib.request.urlopen(geo_url, timeout=15) as res:
+    with urllib.request.urlopen(geo_url, timeout=15, context=ctx) as res:
         geo = json.loads(res.read().decode())
     if not geo.get('results'):
         raise ValueError('Şehir bulunamadı')
@@ -129,7 +133,7 @@ def fetch_weather_data(city):
         f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code"
         f"&wind_speed_unit=kmh&timezone=auto"
     )
-    with urllib.request.urlopen(wx_url, timeout=15) as res:
+    with urllib.request.urlopen(wx_url, timeout=15, context=ctx) as res:
         wx = json.loads(res.read().decode())
 
     cur = wx['current']
