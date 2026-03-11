@@ -112,15 +112,17 @@ def update_city():
 
 weather_cache = {}
 
-def fetch_weather_data(city):
-    import time
+def open_url(url):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=15, context=ctx) as res:
+        return json.loads(res.read().decode())
 
+def fetch_weather_data(city):
     geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json"
-    with urllib.request.urlopen(geo_url, timeout=15, context=ctx) as res:
-        geo = json.loads(res.read().decode())
+    geo = open_url(geo_url)
     if not geo.get('results'):
         raise ValueError('Şehir bulunamadı')
     loc = geo['results'][0]
@@ -133,8 +135,7 @@ def fetch_weather_data(city):
         f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code"
         f"&wind_speed_unit=kmh&timezone=auto"
     )
-    with urllib.request.urlopen(wx_url, timeout=15, context=ctx) as res:
-        wx = json.loads(res.read().decode())
+    wx = open_url(wx_url)
 
     cur = wx['current']
     temp = round(cur['temperature_2m'])
@@ -192,6 +193,7 @@ def get_weather():
             return jsonify(result)
         except Exception as e:
             last_error = e
+            print(f"Weather fetch attempt {attempt+1} failed: {type(e).__name__}: {e}", flush=True)
 
     # Tüm denemeler başarısız → eski cache varsa onu döndür
     if city in weather_cache:
