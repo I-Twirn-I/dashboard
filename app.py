@@ -120,36 +120,50 @@ def get_weather():
     if city in weather_cache and now - weather_cache[city]['time'] < 600:
         return jsonify(weather_cache[city]['data'])
     try:
-        # wttr.in API kullan
-        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
-        req = urllib.request.Request(url, headers={'User-Agent': 'dashboard-app/1.0'})
-        ctx = ssl._create_unverified_context()
-        with urllib.request.urlopen(req, timeout=10, context=ctx) as res:
-            data = json.loads(res.read().decode())
+        # Geocoding: şehir adını koordinata çevir
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json"
+        with urllib.request.urlopen(geo_url, timeout=10) as res:
+            geo = json.loads(res.read().decode())
+        if not geo.get('results'):
+            return jsonify({'error': 'Şehir bulunamadı'}), 404
+        loc = geo['results'][0]
+        lat, lon = loc['latitude'], loc['longitude']
+        city_name = loc['name']
 
-        current = data['current_condition'][0]
-        area = data['nearest_area'][0]
-        city_name = area['areaName'][0]['value']
+        # Hava durumu
+        wx_url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}"
+            f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code"
+            f"&wind_speed_unit=kmh&timezone=auto"
+        )
+        with urllib.request.urlopen(wx_url, timeout=10) as res:
+            wx = json.loads(res.read().decode())
 
-        temp = int(current['temp_C'])
-        feels_like = int(current['FeelsLikeC'])
-        humidity = int(current['humidity'])
-        wind = int(current['windspeedKmph'])
-        desc_en = current['weatherDesc'][0]['value'].lower()
+        cur = wx['current']
+        temp = round(cur['temperature_2m'])
+        feels_like = round(cur['apparent_temperature'])
+        humidity = cur['relative_humidity_2m']
+        wind = round(cur['wind_speed_10m'])
+        code = cur['weather_code']
 
-        # Türkçe açıklama ve ikon
-        if 'sunny' in desc_en or 'clear' in desc_en:
+        # WMO weather code → Türkçe
+        if code == 0:
             desc, icon, anim_type = 'Açık', '☀️', 'sunny'
-        elif 'rain' in desc_en or 'drizzle' in desc_en:
-            desc, icon, anim_type = 'Yağmurlu', '🌧️', 'rainy'
-        elif 'snow' in desc_en or 'sleet' in desc_en:
-            desc, icon, anim_type = 'Karlı', '🌨️', 'snowy'
-        elif 'thunder' in desc_en or 'storm' in desc_en:
-            desc, icon, anim_type = 'Fırtınalı', '⛈️', 'stormy'
-        elif 'fog' in desc_en or 'mist' in desc_en:
-            desc, icon, anim_type = 'Sisli', '🌫️', 'cloudy'
-        elif 'cloud' in desc_en or 'overcast' in desc_en:
+        elif code in (1, 2):
+            desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
+        elif code == 3:
             desc, icon, anim_type = 'Bulutlu', '☁️', 'cloudy'
+        elif code in (45, 48):
+            desc, icon, anim_type = 'Sisli', '🌫️', 'cloudy'
+        elif code in (51, 53, 55, 56, 57):
+            desc, icon, anim_type = 'Çiseleyen', '🌦️', 'rainy'
+        elif code in (61, 63, 65, 66, 67, 80, 81, 82):
+            desc, icon, anim_type = 'Yağmurlu', '🌧️', 'rainy'
+        elif code in (71, 73, 75, 77, 85, 86):
+            desc, icon, anim_type = 'Karlı', '🌨️', 'snowy'
+        elif code in (95, 96, 99):
+            desc, icon, anim_type = 'Fırtınalı', '⛈️', 'stormy'
         else:
             desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
 
