@@ -111,11 +111,6 @@ def update_city():
     return jsonify({'ok': True})
 
 weather_cache = {}
-geo_cache = {
-    'istanbul': {'lat': 41.0136, 'lon': 28.9550, 'name': 'İstanbul'},
-    'ankara': {'lat': 39.9272, 'lon': 32.8644, 'name': 'Ankara'},
-    'izmir': {'lat': 38.4189, 'lon': 27.1287, 'name': 'İzmir'},
-}
 
 def open_url(url):
     ctx = ssl.create_default_context()
@@ -125,50 +120,42 @@ def open_url(url):
     with urllib.request.urlopen(req, timeout=15, context=ctx) as res:
         return json.loads(res.read().decode())
 
+WTTR_CODE_MAP = {
+    113: ('Açık',            '☀️',  'sunny'),
+    116: ('Parçalı bulutlu', '⛅',  'cloudy'),
+    119: ('Bulutlu',         '☁️',  'cloudy'),
+    122: ('Kapalı',          '☁️',  'cloudy'),
+    143: ('Sisli',           '🌫️', 'cloudy'),
+    248: ('Sisli',           '🌫️', 'cloudy'),
+    260: ('Sisli',           '🌫️', 'cloudy'),
+    200: ('Fırtınalı',       '⛈️', 'stormy'),
+    386: ('Fırtınalı',       '⛈️', 'stormy'),
+    389: ('Fırtınalı',       '⛈️', 'stormy'),
+    392: ('Fırtınalı',       '⛈️', 'stormy'),
+    395: ('Fırtınalı',       '⛈️', 'stormy'),
+}
+WTTR_RAIN  = {176,263,266,281,284,293,296,299,302,305,308,353,356,359}
+WTTR_SNOW  = {179,182,185,227,230,323,326,329,332,335,338,350,362,365,368,371,374,377}
+
 def fetch_weather_data(city):
-    key = city.lower().strip()
-    if key in geo_cache:
-        lat, lon, city_name = geo_cache[key]['lat'], geo_cache[key]['lon'], geo_cache[key]['name']
-    else:
-        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json"
-        geo = open_url(geo_url)
-        if not geo.get('results'):
-            raise ValueError('Şehir bulunamadı')
-        loc = geo['results'][0]
-        lat, lon, city_name = loc['latitude'], loc['longitude'], loc['name']
-        geo_cache[key] = {'lat': lat, 'lon': lon, 'name': city_name}
+    url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
+    data = open_url(url)
+    cur = data['current_condition'][0]
+    nearest = data.get('nearest_area', [{}])[0]
+    city_name = nearest.get('areaName', [{}])[0].get('value', city)
 
-    wx_url = (
-        f"https://api.open-meteo.com/v1/forecast"
-        f"?latitude={lat}&longitude={lon}"
-        f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code"
-        f"&wind_speed_unit=kmh&timezone=auto"
-    )
-    wx = open_url(wx_url)
+    temp       = int(cur['temp_C'])
+    feels_like = int(cur['FeelsLikeC'])
+    humidity   = int(cur['humidity'])
+    wind       = int(cur['windspeedKmph'])
+    code       = int(cur['weatherCode'])
 
-    cur = wx['current']
-    temp = round(cur['temperature_2m'])
-    feels_like = round(cur['apparent_temperature'])
-    humidity = cur['relative_humidity_2m']
-    wind = round(cur['wind_speed_10m'])
-    code = cur['weather_code']
-
-    if code == 0:
-        desc, icon, anim_type = 'Açık', '☀️', 'sunny'
-    elif code in (1, 2):
-        desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
-    elif code == 3:
-        desc, icon, anim_type = 'Bulutlu', '☁️', 'cloudy'
-    elif code in (45, 48):
-        desc, icon, anim_type = 'Sisli', '🌫️', 'cloudy'
-    elif code in (51, 53, 55, 56, 57):
-        desc, icon, anim_type = 'Çiseleyen', '🌦️', 'rainy'
-    elif code in (61, 63, 65, 66, 67, 80, 81, 82):
+    if code in WTTR_CODE_MAP:
+        desc, icon, anim_type = WTTR_CODE_MAP[code]
+    elif code in WTTR_RAIN:
         desc, icon, anim_type = 'Yağmurlu', '🌧️', 'rainy'
-    elif code in (71, 73, 75, 77, 85, 86):
+    elif code in WTTR_SNOW:
         desc, icon, anim_type = 'Karlı', '🌨️', 'snowy'
-    elif code in (95, 96, 99):
-        desc, icon, anim_type = 'Fırtınalı', '⛈️', 'stormy'
     else:
         desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
 
