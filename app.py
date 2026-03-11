@@ -111,6 +111,11 @@ def update_city():
     return jsonify({'ok': True})
 
 weather_cache = {}
+geo_cache = {
+    'istanbul': {'lat': 41.0136, 'lon': 28.9550, 'name': 'İstanbul'},
+    'ankara': {'lat': 39.9272, 'lon': 32.8644, 'name': 'Ankara'},
+    'izmir': {'lat': 38.4189, 'lon': 27.1287, 'name': 'İzmir'},
+}
 
 def open_url(url):
     ctx = ssl.create_default_context()
@@ -121,13 +126,17 @@ def open_url(url):
         return json.loads(res.read().decode())
 
 def fetch_weather_data(city):
-    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json"
-    geo = open_url(geo_url)
-    if not geo.get('results'):
-        raise ValueError('Şehir bulunamadı')
-    loc = geo['results'][0]
-    lat, lon = loc['latitude'], loc['longitude']
-    city_name = loc['name']
+    key = city.lower().strip()
+    if key in geo_cache:
+        lat, lon, city_name = geo_cache[key]['lat'], geo_cache[key]['lon'], geo_cache[key]['name']
+    else:
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json"
+        geo = open_url(geo_url)
+        if not geo.get('results'):
+            raise ValueError('Şehir bulunamadı')
+        loc = geo['results'][0]
+        lat, lon, city_name = loc['latitude'], loc['longitude'], loc['name']
+        geo_cache[key] = {'lat': lat, 'lon': lon, 'name': city_name}
 
     wx_url = (
         f"https://api.open-meteo.com/v1/forecast"
