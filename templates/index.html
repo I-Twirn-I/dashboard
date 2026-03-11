@@ -406,6 +406,9 @@
         let notesTimeout = null;
 
         async function init() {
+            fetchSpotify();
+            setInterval(fetchSpotify, 5000);
+
             try {
                 const res = await fetch('/api/data');
                 appData = await res.json();
@@ -422,8 +425,6 @@
             document.getElementById('city-input').value = appData.city || 'Istanbul';
             fetchWeather(appData.city || 'Istanbul');
             renderCalendar();
-            fetchSpotify();
-            setInterval(fetchSpotify, 5000);
             updatePomoUI();
 
             document.getElementById('notes-area').addEventListener('input', () => {

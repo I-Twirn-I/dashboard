@@ -123,7 +123,8 @@ def get_weather():
         # wttr.in API kullan
         url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
         req = urllib.request.Request(url, headers={'User-Agent': 'dashboard-app/1.0'})
-        with urllib.request.urlopen(req, timeout=10) as res:
+        ctx = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as res:
             data = json.loads(res.read().decode())
 
         current = data['current_condition'][0]
