@@ -112,75 +112,90 @@ def update_city():
 
 weather_cache = {}
 
+def fetch_weather_data(city):
+    import time
+    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json"
+    with urllib.request.urlopen(geo_url, timeout=15) as res:
+        geo = json.loads(res.read().decode())
+    if not geo.get('results'):
+        raise ValueError('Şehir bulunamadı')
+    loc = geo['results'][0]
+    lat, lon = loc['latitude'], loc['longitude']
+    city_name = loc['name']
+
+    wx_url = (
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}"
+        f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code"
+        f"&wind_speed_unit=kmh&timezone=auto"
+    )
+    with urllib.request.urlopen(wx_url, timeout=15) as res:
+        wx = json.loads(res.read().decode())
+
+    cur = wx['current']
+    temp = round(cur['temperature_2m'])
+    feels_like = round(cur['apparent_temperature'])
+    humidity = cur['relative_humidity_2m']
+    wind = round(cur['wind_speed_10m'])
+    code = cur['weather_code']
+
+    if code == 0:
+        desc, icon, anim_type = 'Açık', '☀️', 'sunny'
+    elif code in (1, 2):
+        desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
+    elif code == 3:
+        desc, icon, anim_type = 'Bulutlu', '☁️', 'cloudy'
+    elif code in (45, 48):
+        desc, icon, anim_type = 'Sisli', '🌫️', 'cloudy'
+    elif code in (51, 53, 55, 56, 57):
+        desc, icon, anim_type = 'Çiseleyen', '🌦️', 'rainy'
+    elif code in (61, 63, 65, 66, 67, 80, 81, 82):
+        desc, icon, anim_type = 'Yağmurlu', '🌧️', 'rainy'
+    elif code in (71, 73, 75, 77, 85, 86):
+        desc, icon, anim_type = 'Karlı', '🌨️', 'snowy'
+    elif code in (95, 96, 99):
+        desc, icon, anim_type = 'Fırtınalı', '⛈️', 'stormy'
+    else:
+        desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
+
+    return {
+        'city': city_name,
+        'temp': temp,
+        'feels_like': feels_like,
+        'humidity': humidity,
+        'wind': wind,
+        'desc': desc,
+        'icon': icon,
+        'anim_type': anim_type,
+    }
+
 @app.route('/api/weather')
 def get_weather():
-    city = request.args.get('city', 'Istanbul')
     import time
+    city = request.args.get('city', 'Istanbul')
     now = time.time()
+
+    # Cache geçerliyse direkt döndür
     if city in weather_cache and now - weather_cache[city]['time'] < 600:
         return jsonify(weather_cache[city]['data'])
-    try:
-        # Geocoding: şehir adını koordinata çevir
-        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json"
-        with urllib.request.urlopen(geo_url, timeout=10) as res:
-            geo = json.loads(res.read().decode())
-        if not geo.get('results'):
-            return jsonify({'error': 'Şehir bulunamadı'}), 404
-        loc = geo['results'][0]
-        lat, lon = loc['latitude'], loc['longitude']
-        city_name = loc['name']
 
-        # Hava durumu
-        wx_url = (
-            f"https://api.open-meteo.com/v1/forecast"
-            f"?latitude={lat}&longitude={lon}"
-            f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code"
-            f"&wind_speed_unit=kmh&timezone=auto"
-        )
-        with urllib.request.urlopen(wx_url, timeout=10) as res:
-            wx = json.loads(res.read().decode())
+    # 2 kez dene
+    last_error = None
+    for attempt in range(2):
+        try:
+            result = fetch_weather_data(city)
+            weather_cache[city] = {'data': result, 'time': now}
+            return jsonify(result)
+        except Exception as e:
+            last_error = e
 
-        cur = wx['current']
-        temp = round(cur['temperature_2m'])
-        feels_like = round(cur['apparent_temperature'])
-        humidity = cur['relative_humidity_2m']
-        wind = round(cur['wind_speed_10m'])
-        code = cur['weather_code']
+    # Tüm denemeler başarısız → eski cache varsa onu döndür
+    if city in weather_cache:
+        stale = dict(weather_cache[city]['data'])
+        stale['stale'] = True
+        return jsonify(stale)
 
-        # WMO weather code → Türkçe
-        if code == 0:
-            desc, icon, anim_type = 'Açık', '☀️', 'sunny'
-        elif code in (1, 2):
-            desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
-        elif code == 3:
-            desc, icon, anim_type = 'Bulutlu', '☁️', 'cloudy'
-        elif code in (45, 48):
-            desc, icon, anim_type = 'Sisli', '🌫️', 'cloudy'
-        elif code in (51, 53, 55, 56, 57):
-            desc, icon, anim_type = 'Çiseleyen', '🌦️', 'rainy'
-        elif code in (61, 63, 65, 66, 67, 80, 81, 82):
-            desc, icon, anim_type = 'Yağmurlu', '🌧️', 'rainy'
-        elif code in (71, 73, 75, 77, 85, 86):
-            desc, icon, anim_type = 'Karlı', '🌨️', 'snowy'
-        elif code in (95, 96, 99):
-            desc, icon, anim_type = 'Fırtınalı', '⛈️', 'stormy'
-        else:
-            desc, icon, anim_type = 'Parçalı bulutlu', '⛅', 'cloudy'
-
-        result = {
-            'city': city_name,
-            'temp': temp,
-            'feels_like': feels_like,
-            'humidity': humidity,
-            'wind': wind,
-            'desc': desc,
-            'icon': icon,
-            'anim_type': anim_type,
-        }
-        weather_cache[city] = {'data': result, 'time': now}
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    return jsonify({'error': str(last_error)}), 500
 
 @app.route('/spotify/login')
 def spotify_login():
