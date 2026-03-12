@@ -1,4 +1,4 @@
 flask==3.0.0
 flask-login==0.6.3
 gunicorn==21.2.0
-psycopg[binary]==3.2.4
+psycopg[binary]>=3.2.10
