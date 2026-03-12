@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard — Kuzey</title>
+    <title>Dashboard — {{ username }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -295,12 +295,13 @@
             <div style="display:flex; align-items:center; gap:16px;">
                 <div id="spotify-content"></div>
                 <div class="greeting">
-                    <h1 id="greeting-text">Merhaba, <span>Kuzey</span></h1>
+                    <h1 id="greeting-text">Merhaba, <span>{{ username }}</span></h1>
                     <p id="greeting-sub"></p>
                 </div>
             </div>
             <div class="header-actions">
                 <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Tema değiştir">🌙</button>
+                <a href="/logout" title="Çıkış yap" style="background:none;border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text-secondary);text-decoration:none;font-size:0.85rem;font-family:var(--font-main);transition:all 0.2s;" onmouseover="this.style.borderColor='var(--border-hover)';this.style.color='var(--text-primary)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Çıkış</a>
             </div>
         </div>
 
