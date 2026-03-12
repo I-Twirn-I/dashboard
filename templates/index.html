@@ -834,14 +834,10 @@
         }
 
         async function toggleTheme() {
-            try {
-                const data = await apiFetch('/api/theme', { method: 'POST' });
-                if (data) { appData.theme = data.theme; applyTheme(data.theme); }
-            } catch {
-                const newTheme = appData.theme === 'dark' ? 'light' : 'dark';
-                appData.theme = newTheme;
-                applyTheme(newTheme);
-            }
+            const newTheme = appData.theme === 'dark' ? 'light' : 'dark';
+            appData.theme = newTheme;
+            applyTheme(newTheme);
+            fetch('/api/theme', { method: 'POST' }).catch(() => {});
         }
 
         // ── Todos ──────────────────────────────────────────────────────────────
