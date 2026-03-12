@@ -823,8 +823,8 @@
             const city = document.getElementById('city-input').value.trim();
             if (!city) return;
             appData.city = city;
-            await fetch('/api/city', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({city}) });
             fetchWeather(city);
+            fetch('/api/city', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({city}) }).catch(() => {});
         }
 
         // ── Theme ──────────────────────────────────────────────────────────────
@@ -859,29 +859,38 @@
             document.getElementById('todo-count').textContent = `${doneCount}/${todos.length}`;
         }
 
-        async function addTodo() {
+        function nextId(arr) {
+            return (arr.length ? Math.max(...arr.map(x => x.id)) : 0) + 1;
+        }
+
+        function bgSave(url, method = 'POST', body = null) {
+            const opts = { method, headers: body ? {'Content-Type': 'application/json'} : {} };
+            if (body) opts.body = JSON.stringify(body);
+            fetch(url, opts).catch(() => {});
+        }
+
+        function addTodo() {
             const input = document.getElementById('todo-input');
             const text = input.value.trim();
             if (!text) return;
-            const data = await apiFetch('/api/todos', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text}) });
-            if (data) appData.todos = data;
-            else appData.todos.push({ id: Date.now(), text, done: false });
+            const id = nextId(appData.todos || []);
+            appData.todos = [...(appData.todos || []), { id, text, done: false }];
             input.value = '';
             renderTodos();
+            bgSave('/api/todos', 'POST', { text });
         }
 
-        async function toggleTodo(id) {
-            const data = await apiFetch(`/api/todos/${id}/toggle`, { method: 'POST' });
-            if (data) appData.todos = data;
-            else { const t = appData.todos.find(t => t.id === id); if (t) t.done = !t.done; }
+        function toggleTodo(id) {
+            const t = (appData.todos || []).find(t => t.id === id);
+            if (t) t.done = !t.done;
             renderTodos();
+            bgSave(`/api/todos/${id}/toggle`);
         }
 
-        async function deleteTodo(id) {
-            const data = await apiFetch(`/api/todos/${id}`, { method: 'DELETE' });
-            if (data) appData.todos = data;
-            else appData.todos = appData.todos.filter(t => t.id !== id);
+        function deleteTodo(id) {
+            appData.todos = (appData.todos || []).filter(t => t.id !== id);
             renderTodos();
+            bgSave(`/api/todos/${id}`, 'DELETE');
         }
 
         // ── Notes ──────────────────────────────────────────────────────────────
@@ -909,25 +918,23 @@
             `).join('');
         }
 
-        async function addBookmark() {
+        function addBookmark() {
             const icon = document.getElementById('bm-icon').value.trim() || '🔗';
             const name = document.getElementById('bm-name').value.trim();
             const url  = document.getElementById('bm-url').value.trim();
             if (!name || !url) { showToast('İsim ve URL zorunludur.', 'error'); return; }
-            const data = await apiFetch('/api/bookmarks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({icon, name, url}) });
-            if (data) appData.bookmarks = data;
-            else appData.bookmarks.push({icon, name, url});
+            appData.bookmarks = [...(appData.bookmarks || []), { icon, name, url }];
             document.getElementById('bm-icon').value = '';
             document.getElementById('bm-name').value = '';
             document.getElementById('bm-url').value = '';
             renderBookmarks();
+            bgSave('/api/bookmarks', 'POST', { icon, name, url });
         }
 
-        async function deleteBookmark(index) {
-            const data = await apiFetch(`/api/bookmarks/${index}`, { method: 'DELETE' });
-            if (data) appData.bookmarks = data;
-            else appData.bookmarks.splice(index, 1);
+        function deleteBookmark(index) {
+            appData.bookmarks = (appData.bookmarks || []).filter((_, i) => i !== index);
             renderBookmarks();
+            bgSave(`/api/bookmarks/${index}`, 'DELETE');
         }
 
         // ── Pomodoro ───────────────────────────────────────────────────────────
@@ -1058,29 +1065,31 @@
             `).join('');
         }
 
-        async function addReminder() {
+        function addReminder() {
             const title = document.getElementById('rem-title').value.trim();
             const time  = document.getElementById('rem-time').value;
             const repeat = document.getElementById('rem-repeat').value;
             if (!title || !time) { showToast('Başlık ve saat zorunludur.', 'error'); return; }
-            const data = await apiFetch('/api/reminders', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, time, repeat}) });
-            if (data) {
-                appData.reminders = data;
-                document.getElementById('rem-title').value = '';
-                document.getElementById('rem-time').value = '';
-                renderReminders();
-                showToast('Hatırlatıcı eklendi ✓', 'success');
-            }
+            const id = nextId(appData.reminders || []);
+            appData.reminders = [...(appData.reminders || []), { id, title, time, repeat, active: true }];
+            document.getElementById('rem-title').value = '';
+            document.getElementById('rem-time').value = '';
+            renderReminders();
+            showToast('Hatırlatıcı eklendi ✓', 'success');
+            bgSave('/api/reminders', 'POST', { title, time, repeat });
         }
 
-        async function deleteReminder(id) {
-            const data = await apiFetch(`/api/reminders/${id}`, { method: 'DELETE' });
-            if (data) { appData.reminders = data; renderReminders(); }
+        function deleteReminder(id) {
+            appData.reminders = (appData.reminders || []).filter(r => r.id !== id);
+            renderReminders();
+            bgSave(`/api/reminders/${id}`, 'DELETE');
         }
 
-        async function toggleReminder(id) {
-            const data = await apiFetch(`/api/reminders/${id}/toggle`, { method: 'POST' });
-            if (data) { appData.reminders = data; renderReminders(); }
+        function toggleReminder(id) {
+            const r = (appData.reminders || []).find(r => r.id === id);
+            if (r) r.active = !r.active;
+            renderReminders();
+            bgSave(`/api/reminders/${id}/toggle`);
         }
 
         function checkReminders() {
@@ -1186,27 +1195,34 @@
             }).join('');
         }
 
-        async function addHabit() {
+        function addHabit() {
             const emoji = document.getElementById('habit-emoji').value.trim() || '✅';
             const name  = document.getElementById('habit-name').value.trim();
             if (!name) { showToast('Alışkanlık adı zorunludur.', 'error'); return; }
-            const data = await apiFetch('/api/habits', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({emoji, name}) });
-            if (data) {
-                appData.habits = data;
-                document.getElementById('habit-emoji').value = '';
-                document.getElementById('habit-name').value = '';
-                renderHabits();
+            const id = nextId(appData.habits || []);
+            appData.habits = [...(appData.habits || []), { id, name, emoji, checks: {} }];
+            document.getElementById('habit-emoji').value = '';
+            document.getElementById('habit-name').value = '';
+            renderHabits();
+            bgSave('/api/habits', 'POST', { emoji, name });
+        }
+
+        function deleteHabit(id) {
+            appData.habits = (appData.habits || []).filter(h => h.id !== id);
+            renderHabits();
+            bgSave(`/api/habits/${id}`, 'DELETE');
+        }
+
+        function toggleHabit(id) {
+            const today = todayKey();
+            const h = (appData.habits || []).find(h => h.id === id);
+            if (h) {
+                if (!h.checks) h.checks = {};
+                if (h.checks[today]) delete h.checks[today];
+                else h.checks[today] = true;
             }
-        }
-
-        async function deleteHabit(id) {
-            const data = await apiFetch(`/api/habits/${id}`, { method: 'DELETE' });
-            if (data) { appData.habits = data; renderHabits(); }
-        }
-
-        async function toggleHabit(id) {
-            const data = await apiFetch(`/api/habits/${id}/check`, { method: 'POST' });
-            if (data) { appData.habits = data; renderHabits(); }
+            renderHabits();
+            bgSave(`/api/habits/${id}/check`);
         }
 
         // ── Drag-and-drop ──────────────────────────────────────────────────────
