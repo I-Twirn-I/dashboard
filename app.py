@@ -529,22 +529,18 @@ def get_rates():
     except Exception as e:
         print(f"Forex fetch failed: {e}", flush=True)
 
-    # Kripto: BTC/USD ve ETH/USD (Binance)
+    # Kripto: BTC/USD ve ETH/USD (CryptoCompare)
     try:
-        btc = open_url('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT')
-        result['BTC/USD'] = round(float(btc['price']), 0)
+        crypto = open_url('https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD')
+        result['BTC/USD'] = round(float(crypto['BTC']['USD']), 0)
+        result['ETH/USD'] = round(float(crypto['ETH']['USD']), 2)
     except Exception as e:
-        print(f"BTC fetch failed: {e}", flush=True)
-    try:
-        eth = open_url('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT')
-        result['ETH/USD'] = round(float(eth['price']), 2)
-    except Exception as e:
-        print(f"ETH fetch failed: {e}", flush=True)
+        print(f"Crypto fetch failed: {e}", flush=True)
 
-    # Gram Altın (TRY) — Binance XAUUSDT
+    # Gram Altın (TRY) — metals.live
     try:
-        gold = open_url('https://api.binance.com/api/v3/ticker/price?symbol=XAUUSDT')
-        gold_oz_usd = float(gold['price'])
+        gold_data = open_url('https://api.metals.live/v1/spot')
+        gold_oz_usd = float(gold_data[0]['gold'])
         usd_try = result.get('_usd_try', 1)
         result['Gram Altın'] = round((gold_oz_usd / 31.1035) * usd_try, 2)
     except Exception as e:

@@ -69,15 +69,7 @@
             transition: background var(--transition), color var(--transition);
         }
 
-        .container { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
-
-        /* ── Layout ── */
-        .main-layout {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-        }
-        .main-content { flex: 1; min-width: 0; }
+        .container { max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
 
         /* ── Header ── */
         .header {
@@ -336,25 +328,7 @@
         .pomodoro-btn.reset { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); }
         .pomodoro-btn.reset:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 
-        /* ── Reminders sidebar ── */
-        .reminders-sidebar {
-            width: 260px;
-            flex-shrink: 0;
-            position: sticky;
-            top: 24px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-            max-height: calc(100vh - 48px);
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .reminders-sidebar::-webkit-scrollbar { width: 4px; }
-        .reminders-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-        .reminders-sidebar .card-title { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-secondary); }
+        /* ── Reminders card ── */
         .reminder-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
         .reminder-list::-webkit-scrollbar { width: 4px; }
         .reminder-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -453,14 +427,8 @@
         @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(20px); } }
 
         /* ── Responsive / Mobile ── */
-        @media (max-width: 1100px) {
+        @media (max-width: 1024px) {
             .grid { grid-template-columns: repeat(2, 1fr); }
-            .reminders-sidebar { width: 220px; }
-        }
-
-        @media (max-width: 768px) {
-            .main-layout { flex-direction: column; }
-            .reminders-sidebar { width: 100%; position: static; max-height: none; }
         }
 
         @media (max-width: 640px) {
@@ -498,8 +466,6 @@
             </div>
         </div>
 
-        <div class="main-layout">
-        <div class="main-content">
         <div class="grid" id="main-grid">
 
             <!-- Saat -->
@@ -618,30 +584,28 @@
                 </div>
             </div>
 
-        </div><!-- /grid -->
-        </div><!-- /main-content -->
-
-        <!-- Hatırlatıcılar Sidebar -->
-        <div class="reminders-sidebar">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-                <span class="card-title">🔔 Hatırlatıcılar</span>
-                <span id="reminder-count" style="font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);"></span>
-            </div>
-            <div class="reminder-list" id="reminder-list"></div>
-            <div class="add-reminder-form">
-                <input type="text" id="rem-title" placeholder="Hatırlatıcı başlığı..." />
-                <div class="row">
-                    <input type="time" id="rem-time" />
-                    <select id="rem-repeat">
-                        <option value="daily">Her gün</option>
-                        <option value="once">Bir kez</option>
-                    </select>
+            <!-- Hatırlatıcılar -->
+            <div class="card reminders-card" data-card="reminders">
+                <span class="card-drag-handle" title="Taşı">⠿</span>
+                <div class="card-header">
+                    <span class="card-title">Hatırlatıcılar</span>
+                    <span id="reminder-count" style="font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);"></span>
                 </div>
-                <button class="btn-small" onclick="addReminder()" style="width:100%">+ Ekle</button>
+                <div class="reminder-list" id="reminder-list"></div>
+                <div class="add-reminder-form">
+                    <input type="text" id="rem-title" placeholder="Hatırlatıcı başlığı..." />
+                    <div class="row">
+                        <input type="time" id="rem-time" />
+                        <select id="rem-repeat">
+                            <option value="daily">Her gün</option>
+                            <option value="once">Bir kez</option>
+                        </select>
+                        <button class="btn-small" onclick="addReminder()">+ Ekle</button>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        </div><!-- /main-layout -->
+        </div><!-- /grid -->
     </div><!-- /container -->
 
     <script>
