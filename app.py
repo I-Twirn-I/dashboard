@@ -529,22 +529,29 @@ def get_rates():
     except Exception as e:
         print(f"Forex fetch failed: {e}", flush=True)
 
-    # Kripto: BTC/USD ve ETH/USD (CryptoCompare)
+    # Kripto: BTC/USD ve ETH/USD (CoinGecko)
     try:
-        crypto = open_url('https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD')
-        result['BTC/USD'] = round(float(crypto['BTC']['USD']), 0)
-        result['ETH/USD'] = round(float(crypto['ETH']['USD']), 2)
+        crypto = open_url('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd')
+        result['BTC/USD'] = round(float(crypto['bitcoin']['usd']), 0)
+        result['ETH/USD'] = round(float(crypto['ethereum']['usd']), 2)
     except Exception as e:
         print(f"Crypto fetch failed: {e}", flush=True)
 
-    # Gram Altın (TRY) — metals.live
+    # Gram Altın (TRY) — metals.live with CoinGecko fallback
     try:
         gold_data = open_url('https://api.metals.live/v1/spot')
         gold_oz_usd = float(gold_data[0]['gold'])
         usd_try = result.get('_usd_try', 1)
         result['Gram Altın'] = round((gold_oz_usd / 31.1035) * usd_try, 2)
     except Exception as e:
-        print(f"Gold fetch failed: {e}", flush=True)
+        print(f"Gold fetch failed (metals.live): {e}", flush=True)
+        try:
+            gold_data = open_url('https://api.coingecko.com/api/v3/simple/price?ids=gold&vs_currencies=usd')
+            gold_oz_usd = float(gold_data['gold']['usd'])
+            usd_try = result.get('_usd_try', 1)
+            result['Gram Altın'] = round((gold_oz_usd / 31.1035) * usd_try, 2)
+        except Exception as e2:
+            print(f"Gold fetch failed (coingecko): {e2}", flush=True)
 
     result.pop('_usd_try', None)
     _rates_cache['data'] = result

@@ -116,11 +116,39 @@
         }
         .btn-header:hover { border-color: var(--border-hover); color: var(--text-primary); }
 
+        /* ── Main layout (grid + sidebar) ── */
+        .main-layout {
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
         /* ── Grid ── */
         .grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 14px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* ── Right sidebar ── */
+        .right-sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .right-sidebar .card {
+            flex: 1;
+        }
+
+        .right-sidebar .reminders-card .reminder-list {
+            max-height: none;
+            flex: 1;
+            overflow-y: auto;
         }
 
         /* ── Card base ── */
@@ -431,13 +459,21 @@
         @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(20px); } }
 
         /* ── Responsive / Mobile ── */
+        @media (max-width: 1280px) {
+            .right-sidebar { width: 280px; }
+        }
+
         @media (max-width: 1024px) {
+            .main-layout { flex-direction: column; }
+            .right-sidebar { width: 100%; flex-direction: row; }
+            .right-sidebar .card { flex: 1; }
             .grid { grid-template-columns: repeat(2, 1fr); }
         }
 
         @media (max-width: 640px) {
             .container { padding: 16px 12px; }
             .grid { grid-template-columns: 1fr; gap: 12px; }
+            .right-sidebar { flex-direction: column; }
             .header { margin-bottom: 20px; }
             .greeting h1 { font-size: 1.8rem; }
             .greeting p { font-size: 0.9rem; }
@@ -470,6 +506,7 @@
             </div>
         </div>
 
+        <div class="main-layout">
         <div class="grid" id="main-grid">
 
             <!-- Saat -->
@@ -576,21 +613,13 @@
                 </div>
             </div>
 
-            <!-- Piyasalar -->
-            <div class="card" data-card="rates">
-                <span class="card-drag-handle" title="Taşı">⠿</span>
-                <div class="card-header">
-                    <span class="card-title">📈 Piyasalar</span>
-                    <span id="rates-updated" style="font-size:0.72rem;color:var(--text-muted);"></span>
-                </div>
-                <div id="rates-list">
-                    <div style="font-size:0.85rem;color:var(--text-muted);text-align:center;padding:16px;">Yükleniyor...</div>
-                </div>
-            </div>
+        </div><!-- /grid -->
+
+        <!-- Right sidebar -->
+        <div class="right-sidebar">
 
             <!-- Hatırlatıcılar -->
             <div class="card reminders-card" data-card="reminders">
-                <span class="card-drag-handle" title="Taşı">⠿</span>
                 <div class="card-header">
                     <span class="card-title">Hatırlatıcılar</span>
                     <span id="reminder-count" style="font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);"></span>
@@ -609,7 +638,20 @@
                 </div>
             </div>
 
-        </div><!-- /grid -->
+            <!-- Piyasalar -->
+            <div class="card" data-card="rates">
+                <div class="card-header">
+                    <span class="card-title">📈 Piyasalar</span>
+                    <span id="rates-updated" style="font-size:0.72rem;color:var(--text-muted);"></span>
+                </div>
+                <div id="rates-list">
+                    <div style="font-size:0.85rem;color:var(--text-muted);text-align:center;padding:16px;">Yükleniyor...</div>
+                </div>
+            </div>
+
+        </div><!-- /right-sidebar -->
+
+        </div><!-- /main-layout -->
     </div><!-- /container -->
 
     <script>
