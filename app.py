@@ -13,6 +13,66 @@ from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# ── Database backend seçimi ────────────────────────────────────────────────────
+# Render'da DATABASE_URL set edilirse PostgreSQL, yoksa SQLite kullanılır.
+
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+USE_PG = bool(DATABASE_URL)
+LOCAL_DB = 'dashboard.db'
+
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
+
+
+class Db:
+    """SQLite ve PostgreSQL için ortak arayüz."""
+
+    def __init__(self):
+        if USE_PG:
+            self._conn = psycopg2.connect(DATABASE_URL)
+            self._cur  = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        else:
+            self._conn = sqlite3.connect(LOCAL_DB)
+            self._conn.row_factory = sqlite3.Row
+            self._cur  = self._conn.cursor()
+        self._ph = '%s' if USE_PG else '?'
+
+    def _sql(self, q):
+        return q.replace('?', self._ph)
+
+    def execute(self, query, params=()):
+        self._cur.execute(self._sql(query), params)
+        return self
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        return dict(row) if row else None
+
+    def fetchall(self):
+        return [dict(r) for r in self._cur.fetchall()]
+
+    def commit(self):
+        self._conn.commit()
+        return self
+
+    def close(self):
+        try:
+            self._cur.close()
+        except Exception:
+            pass
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+
 SPOTIFY_CLIENT_ID     = os.environ.get('SPOTIFY_CLIENT_ID', '')
 SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET', '')
 SPOTIFY_REDIRECT_URI  = os.environ.get('SPOTIFY_REDIRECT_URI', 'https://dashboard-8rk5.onrender.com/callback')
@@ -24,8 +84,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'change-this-before-deploying')
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-
-DATABASE = 'dashboard.db'
 
 DEFAULT_CARD_ORDER = ['clock', 'weather', 'bookmarks', 'todos', 'notes', 'pomodoro', 'reminders', 'habits']
 
@@ -65,29 +123,35 @@ def rate_limit(max_requests=30, window=60):
     return decorator
 
 
-# ── Database ───────────────────────────────────────────────────────────────────
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
+# ── Database init ──────────────────────────────────────────────────────────────
 
 def init_db():
-    conn = get_db()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-            username             TEXT UNIQUE NOT NULL,
-            email                TEXT UNIQUE NOT NULL,
-            password_hash        TEXT NOT NULL,
-            data                 TEXT NOT NULL DEFAULT '{}',
-            spotify_access_token  TEXT DEFAULT '',
-            spotify_refresh_token TEXT DEFAULT ''
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    with Db() as db:
+        if USE_PG:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id                    SERIAL PRIMARY KEY,
+                    username              TEXT UNIQUE NOT NULL,
+                    email                 TEXT UNIQUE NOT NULL,
+                    password_hash         TEXT NOT NULL,
+                    data                  TEXT NOT NULL DEFAULT '{}',
+                    spotify_access_token  TEXT DEFAULT '',
+                    spotify_refresh_token TEXT DEFAULT ''
+                )
+            ''')
+        else:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username              TEXT UNIQUE NOT NULL,
+                    email                 TEXT UNIQUE NOT NULL,
+                    password_hash         TEXT NOT NULL,
+                    data                  TEXT NOT NULL DEFAULT '{}',
+                    spotify_access_token  TEXT DEFAULT '',
+                    spotify_refresh_token TEXT DEFAULT ''
+                )
+            ''')
+        db.commit()
 
 
 # ── Flask-Login ────────────────────────────────────────────────────────────────
@@ -101,9 +165,8 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = get_db()
-    row = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
-    conn.close()
+    with Db() as db:
+        row = db.execute('SELECT id, username, email FROM users WHERE id = ?', (user_id,)).fetchone()
     if row:
         return User(row['id'], row['username'], row['email'])
     return None
@@ -112,9 +175,8 @@ def load_user(user_id):
 # ── Per-user data helpers ──────────────────────────────────────────────────────
 
 def load_data():
-    conn = get_db()
-    row = conn.execute('SELECT data FROM users WHERE id = ?', (current_user.id,)).fetchone()
-    conn.close()
+    with Db() as db:
+        row = db.execute('SELECT data FROM users WHERE id = ?', (current_user.id,)).fetchone()
     if row and row['data']:
         try:
             stored = json.loads(row['data'])
@@ -129,50 +191,46 @@ def load_data():
 
 
 def save_data(data):
-    conn = get_db()
-    conn.execute('UPDATE users SET data = ? WHERE id = ?',
-                 (json.dumps(data, ensure_ascii=False), current_user.id))
-    conn.commit()
-    conn.close()
+    with Db() as db:
+        db.execute('UPDATE users SET data = ? WHERE id = ?',
+                   (json.dumps(data, ensure_ascii=False), current_user.id))
+        db.commit()
 
 
 def get_spotify_tokens():
-    conn = get_db()
-    row = conn.execute(
-        'SELECT spotify_access_token, spotify_refresh_token FROM users WHERE id = ?',
-        (current_user.id,)
-    ).fetchone()
-    conn.close()
+    with Db() as db:
+        row = db.execute(
+            'SELECT spotify_access_token, spotify_refresh_token FROM users WHERE id = ?',
+            (current_user.id,)
+        ).fetchone()
     return {
-        'access_token':  row['spotify_access_token']  if row else '',
-        'refresh_token': row['spotify_refresh_token'] if row else '',
+        'access_token':  (row or {}).get('spotify_access_token', ''),
+        'refresh_token': (row or {}).get('spotify_refresh_token', ''),
     }
 
 
 def set_spotify_tokens(access_token, refresh_token=None):
-    conn = get_db()
-    if refresh_token:
-        conn.execute(
-            'UPDATE users SET spotify_access_token = ?, spotify_refresh_token = ? WHERE id = ?',
-            (access_token, refresh_token, current_user.id)
-        )
-    else:
-        conn.execute(
-            'UPDATE users SET spotify_access_token = ? WHERE id = ?',
-            (access_token, current_user.id)
-        )
-    conn.commit()
-    conn.close()
+    with Db() as db:
+        if refresh_token:
+            db.execute(
+                'UPDATE users SET spotify_access_token = ?, spotify_refresh_token = ? WHERE id = ?',
+                (access_token, refresh_token, current_user.id)
+            )
+        else:
+            db.execute(
+                'UPDATE users SET spotify_access_token = ? WHERE id = ?',
+                (access_token, current_user.id)
+            )
+        db.commit()
 
 
 def clear_spotify_tokens():
-    conn = get_db()
-    conn.execute(
-        "UPDATE users SET spotify_access_token = '', spotify_refresh_token = '' WHERE id = ?",
-        (current_user.id,)
-    )
-    conn.commit()
-    conn.close()
+    with Db() as db:
+        db.execute(
+            "UPDATE users SET spotify_access_token = '', spotify_refresh_token = '' WHERE id = ?",
+            (current_user.id,)
+        )
+        db.commit()
 
 
 # ── Auth routes ────────────────────────────────────────────────────────────────
@@ -186,12 +244,10 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        conn = get_db()
-        row = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-        conn.close()
+        with Db() as db:
+            row = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         if row and check_password_hash(row['password_hash'], password):
-            user = User(row['id'], row['username'], row['email'])
-            login_user(user, remember=True)
+            login_user(User(row['id'], row['username'], row['email']), remember=True)
             return redirect(url_for('index'))
         error = 'Kullanıcı adı veya şifre hatalı.'
     return render_template('login.html', error=error, registered=registered)
@@ -212,14 +268,13 @@ def register():
             error = 'Şifre en az 6 karakter olmalı.'
         else:
             try:
-                conn = get_db()
-                conn.execute(
-                    'INSERT INTO users (username, email, password_hash, data) VALUES (?, ?, ?, ?)',
-                    (username, email, generate_password_hash(password),
-                     json.dumps(DEFAULT_DATA, ensure_ascii=False))
-                )
-                conn.commit()
-                conn.close()
+                with Db() as db:
+                    db.execute(
+                        'INSERT INTO users (username, email, password_hash, data) VALUES (?, ?, ?, ?)',
+                        (username, email, generate_password_hash(password),
+                         json.dumps(DEFAULT_DATA, ensure_ascii=False))
+                    )
+                    db.commit()
                 return redirect(url_for('login') + '?registered=1')
             except Exception:
                 error = 'Bu kullanıcı adı veya e-posta zaten kullanımda.'
