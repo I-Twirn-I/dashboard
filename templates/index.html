@@ -69,21 +69,21 @@
             transition: background var(--transition), color var(--transition);
         }
 
-        .container { max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
+        .container { max-width: 1280px; margin: 0 auto; padding: 16px 24px; }
 
         /* ── Header ── */
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 32px;
+            margin-bottom: 14px;
             flex-wrap: wrap;
-            gap: 16px;
+            gap: 10px;
         }
 
-        .greeting h1 { font-size: 2.4rem; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 4px; }
+        .greeting h1 { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 2px; }
         .greeting h1 span { color: var(--accent); }
-        .greeting p { color: var(--text-secondary); font-size: 1.05rem; font-weight: 300; }
+        .greeting p { color: var(--text-secondary); font-size: 0.95rem; font-weight: 300; }
 
         .header-actions { display: flex; gap: 8px; align-items: center; }
 
@@ -116,7 +116,7 @@
         .grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
+            gap: 14px;
         }
 
         /* ── Card base ── */
@@ -124,7 +124,7 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 24px;
+            padding: 18px;
             transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
             position: relative;
             overflow: hidden;
@@ -217,7 +217,7 @@
 
         /* ── Clock card ── */
         .clock-card { grid-column: span 1; }
-        .clock-time { font-family: var(--font-mono); font-size: 3rem; font-weight: 500; letter-spacing: -2px; line-height: 1; }
+        .clock-time { font-family: var(--font-mono); font-size: 2.6rem; font-weight: 500; letter-spacing: -2px; line-height: 1; }
         .clock-seconds { font-size: 1.6rem; color: var(--text-secondary); }
         .clock-date { font-size: 0.9rem; color: var(--text-secondary); margin-top: 8px; font-weight: 300; }
         .clock-secondary-time { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 400; color: var(--text-secondary); }
@@ -228,7 +228,7 @@
         .calendar-nav { background: none; color: var(--text-secondary); border: none; padding: 4px 8px; font-size: 1rem; cursor: pointer; border-radius: 6px; transition: all 0.2s; }
         .calendar-nav:hover { background: var(--bg-input); color: var(--text-primary); transform: none; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-        .calendar-day { text-align: center; font-size: 0.72rem; padding: 4px 2px; border-radius: 6px; color: var(--text-secondary); }
+        .calendar-day { text-align: center; font-size: 0.7rem; padding: 2px 2px; border-radius: 6px; color: var(--text-secondary); }
         .calendar-day.today { background: var(--accent); color: white; font-weight: 600; }
         .calendar-day.empty { color: transparent; }
         .calendar-day-name { text-align: center; font-size: 0.65rem; font-weight: 600; color: var(--text-muted); padding: 4px 2px; }
