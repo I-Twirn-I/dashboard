@@ -504,6 +504,54 @@ def check_habit(habit_id):
     return jsonify(data['habits'])
 
 
+# ── Rates (Döviz / Kripto / Altın) ────────────────────────────────────────────
+
+_rates_cache = {}
+
+@app.route('/api/rates')
+@login_required
+@rate_limit(10, 60)
+def get_rates():
+    now = time.time()
+    if 'data' in _rates_cache and now - _rates_cache.get('time', 0) < 300:
+        return jsonify(_rates_cache['data'])
+
+    result = {}
+
+    # Forex: USD/TRY ve EUR/TRY
+    try:
+        fx = open_url('https://api.frankfurter.app/latest?base=USD&symbols=TRY,EUR')
+        usd_try = fx['rates']['TRY']
+        usd_eur = fx['rates']['EUR']
+        result['USD/TRY'] = round(usd_try, 2)
+        result['EUR/TRY'] = round(usd_try / usd_eur, 2)
+        result['_usd_try'] = usd_try
+    except Exception as e:
+        print(f"Forex fetch failed: {e}", flush=True)
+
+    # Kripto: BTC/USD ve ETH/USD
+    try:
+        crypto = open_url('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd')
+        result['BTC/USD'] = crypto['bitcoin']['usd']
+        result['ETH/USD'] = crypto['ethereum']['usd']
+    except Exception as e:
+        print(f"Crypto fetch failed: {e}", flush=True)
+
+    # Gram Altın (TRY)
+    try:
+        gold = open_url('https://api.metals.live/v1/spot/gold')
+        gold_oz_usd = gold[0]['gold']
+        usd_try = result.get('_usd_try', 1)
+        result['Gram Altın'] = round((gold_oz_usd / 31.1035) * usd_try, 2)
+    except Exception as e:
+        print(f"Gold fetch failed: {e}", flush=True)
+
+    result.pop('_usd_try', None)
+    _rates_cache['data'] = result
+    _rates_cache['time'] = now
+    return jsonify(result)
+
+
 # ── Weather ────────────────────────────────────────────────────────────────────
 
 weather_cache = {}

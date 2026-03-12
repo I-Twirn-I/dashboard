@@ -418,6 +418,20 @@
         }
         .spotify-btn:hover { background: var(--accent); color: white; }
 
+        /* ── Rates widget ── */
+        .rates-widget { display: flex; flex-direction: column; gap: 6px; }
+        .rates-title { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-secondary); margin-bottom: 4px; }
+        .rate-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 10px; border-radius: var(--radius-sm);
+            background: var(--bg-input); border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .rate-item:hover { border-color: var(--border-hover); }
+        .rate-label { font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+        .rate-value { font-family: var(--font-mono); font-size: 0.88rem; font-weight: 500; color: var(--text-primary); }
+        .rates-updated { font-size: 0.68rem; color: var(--text-muted); text-align: right; margin-top: 4px; }
+
         /* ── Toast ── */
         #toast-container {
             position: fixed; bottom: 24px; right: 24px;
@@ -615,6 +629,15 @@
             </div>
         </div>
 
+        <!-- Döviz / Kripto / Altın -->
+        <div class="rates-widget" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+            <div class="rates-title">📈 Piyasalar</div>
+            <div id="rates-list">
+                <div style="font-size:0.82rem;color:var(--text-muted);text-align:center;padding:8px;">Yükleniyor...</div>
+            </div>
+            <div class="rates-updated" id="rates-updated"></div>
+        </div>
+
         </div><!-- /main-layout -->
     </div><!-- /container -->
 
@@ -677,6 +700,8 @@
             initSortable();
             requestNotifPermission();
             setInterval(checkReminders, 30000);
+            fetchRates();
+            setInterval(fetchRates, 300000);
 
             document.getElementById('notes-area').addEventListener('input', () => {
                 const status = document.getElementById('notes-status');
@@ -1234,6 +1259,42 @@
         function changeMonth(dir) {
             calendarDate.setMonth(calendarDate.getMonth() + dir);
             renderCalendar();
+        }
+
+        // ── Rates ─────────────────────────────────────────────────────────────
+        const RATE_META = {
+            'USD/TRY':    { icon: '💵', suffix: ' ₺' },
+            'EUR/TRY':    { icon: '💶', suffix: ' ₺' },
+            'BTC/USD':    { icon: '₿',  suffix: ' $', crypto: true },
+            'ETH/USD':    { icon: 'Ξ',  suffix: ' $', crypto: true },
+            'Gram Altın': { icon: '🥇', suffix: ' ₺' },
+        };
+
+        function formatRate(key, val) {
+            const meta = RATE_META[key] || { icon: '', suffix: '' };
+            if (meta.crypto) return val.toLocaleString('en-US', { maximumFractionDigits: 0 });
+            return val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        async function fetchRates() {
+            try {
+                const res = await fetch('/api/rates');
+                if (!res.ok) return;
+                const data = await res.json();
+                const order = ['USD/TRY', 'EUR/TRY', 'BTC/USD', 'ETH/USD', 'Gram Altın'];
+                const list = document.getElementById('rates-list');
+                list.innerHTML = order.filter(k => data[k] !== undefined).map(k => {
+                    const meta = RATE_META[k];
+                    return `
+                        <div class="rate-item">
+                            <span class="rate-label">${meta.icon} ${k}</span>
+                            <span class="rate-value">${formatRate(k, data[k])}${meta.suffix}</span>
+                        </div>`;
+                }).join('');
+                const now = new Date();
+                document.getElementById('rates-updated').textContent =
+                    `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} güncellendi`;
+            } catch {}
         }
 
         // ── Utils ──────────────────────────────────────────────────────────────
