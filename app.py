@@ -6,6 +6,9 @@ import urllib.parse
 import urllib.error
 import ssl
 import base64
+import time
+from collections import defaultdict
+from functools import wraps
 from flask import Flask, jsonify, request, render_template, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -24,6 +27,8 @@ login_manager.login_view = 'login'
 
 DATABASE = 'dashboard.db'
 
+DEFAULT_CARD_ORDER = ['clock', 'weather', 'bookmarks', 'todos', 'notes', 'pomodoro', 'reminders', 'habits']
+
 DEFAULT_DATA = {
     "todos": [],
     "notes": "",
@@ -35,10 +40,32 @@ DEFAULT_DATA = {
     ],
     "theme": "dark",
     "city": "Istanbul",
+    "reminders": [],
+    "habits": [],
+    "card_order": DEFAULT_CARD_ORDER,
 }
 
 
-# ── Database ──────────────────────────────────────────────────────────────────
+# ── Rate limiting ──────────────────────────────────────────────────────────────
+
+_rate_store = defaultdict(list)
+
+def rate_limit(max_requests=30, window=60):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            ip = request.remote_addr
+            now = time.time()
+            _rate_store[ip] = [t for t in _rate_store[ip] if now - t < window]
+            if len(_rate_store[ip]) >= max_requests:
+                return jsonify({'error': 'Çok fazla istek. Lütfen bekleyin.'}), 429
+            _rate_store[ip].append(now)
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# ── Database ───────────────────────────────────────────────────────────────────
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -63,7 +90,7 @@ def init_db():
     conn.close()
 
 
-# ── Flask-Login ───────────────────────────────────────────────────────────────
+# ── Flask-Login ────────────────────────────────────────────────────────────────
 
 class User(UserMixin):
     def __init__(self, id, username, email):
@@ -82,7 +109,7 @@ def load_user(user_id):
     return None
 
 
-# ── Per-user data helpers ─────────────────────────────────────────────────────
+# ── Per-user data helpers ──────────────────────────────────────────────────────
 
 def load_data():
     conn = get_db()
@@ -93,6 +120,8 @@ def load_data():
             stored = json.loads(row['data'])
             merged = dict(DEFAULT_DATA)
             merged.update(stored)
+            if 'card_order' not in merged:
+                merged['card_order'] = DEFAULT_CARD_ORDER[:]
             return merged
         except Exception:
             pass
@@ -139,14 +168,14 @@ def set_spotify_tokens(access_token, refresh_token=None):
 def clear_spotify_tokens():
     conn = get_db()
     conn.execute(
-        'UPDATE users SET spotify_access_token = \'\', spotify_refresh_token = \'\' WHERE id = ?',
+        "UPDATE users SET spotify_access_token = '', spotify_refresh_token = '' WHERE id = ?",
         (current_user.id,)
     )
     conn.commit()
     conn.close()
 
 
-# ── Auth routes ───────────────────────────────────────────────────────────────
+# ── Auth routes ────────────────────────────────────────────────────────────────
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -204,7 +233,7 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ── Main page ─────────────────────────────────────────────────────────────────
+# ── Main page ──────────────────────────────────────────────────────────────────
 
 @app.route('/')
 @login_required
@@ -212,7 +241,7 @@ def index():
     return render_template('index.html', username=current_user.username)
 
 
-# ── Data API ──────────────────────────────────────────────────────────────────
+# ── Data API ───────────────────────────────────────────────────────────────────
 
 @app.route('/api/data')
 @login_required
@@ -222,11 +251,14 @@ def get_data():
 
 @app.route('/api/todos', methods=['POST'])
 @login_required
+@rate_limit(30, 60)
 def add_todo():
+    body = request.get_json(silent=True)
+    if not body or not body.get('text', '').strip():
+        return jsonify({'error': 'Görev metni boş olamaz.'}), 400
     data = load_data()
-    body = request.get_json()
     new_id = max((t['id'] for t in data['todos']), default=0) + 1
-    data['todos'].append({'id': new_id, 'text': body['text'], 'done': False})
+    data['todos'].append({'id': new_id, 'text': body['text'].strip(), 'done': False})
     save_data(data)
     return jsonify(data['todos'])
 
@@ -254,18 +286,26 @@ def delete_todo(todo_id):
 
 @app.route('/api/notes', methods=['POST'])
 @login_required
+@rate_limit(60, 60)
 def save_notes():
+    body = request.get_json(silent=True)
+    if body is None:
+        return jsonify({'error': 'Geçersiz istek.'}), 400
     data = load_data()
-    data['notes'] = request.get_json()['notes']
+    data['notes'] = body.get('notes', '')
     save_data(data)
     return jsonify({'ok': True})
 
 
 @app.route('/api/bookmarks', methods=['POST'])
 @login_required
+@rate_limit(20, 60)
 def add_bookmark():
+    body = request.get_json(silent=True)
+    if not body or not body.get('name') or not body.get('url'):
+        return jsonify({'error': 'İsim ve URL zorunludur.'}), 400
     data = load_data()
-    data['bookmarks'].append(request.get_json())
+    data['bookmarks'].append(body)
     save_data(data)
     return jsonify(data['bookmarks'])
 
@@ -292,13 +332,124 @@ def toggle_theme():
 @app.route('/api/city', methods=['POST'])
 @login_required
 def update_city():
+    body = request.get_json(silent=True)
+    if not body or not body.get('city', '').strip():
+        return jsonify({'error': 'Şehir adı boş olamaz.'}), 400
     data = load_data()
-    data['city'] = request.get_json()['city']
+    data['city'] = body['city'].strip()
     save_data(data)
     return jsonify({'ok': True})
 
 
-# ── Weather ───────────────────────────────────────────────────────────────────
+@app.route('/api/card-order', methods=['POST'])
+@login_required
+def save_card_order():
+    body = request.get_json(silent=True)
+    if not body or not isinstance(body.get('order'), list):
+        return jsonify({'error': 'Geçersiz sıralama.'}), 400
+    data = load_data()
+    data['card_order'] = body['order']
+    save_data(data)
+    return jsonify({'ok': True})
+
+
+# ── Reminders API ──────────────────────────────────────────────────────────────
+
+@app.route('/api/reminders', methods=['POST'])
+@login_required
+@rate_limit(20, 60)
+def add_reminder():
+    body = request.get_json(silent=True)
+    if not body or not body.get('title', '').strip() or not body.get('time', '').strip():
+        return jsonify({'error': 'Başlık ve saat zorunludur.'}), 400
+    data = load_data()
+    if 'reminders' not in data:
+        data['reminders'] = []
+    new_id = max((r['id'] for r in data['reminders']), default=0) + 1
+    data['reminders'].append({
+        'id': new_id,
+        'title': body['title'].strip(),
+        'time': body['time'].strip(),
+        'repeat': body.get('repeat', 'daily'),
+        'active': True,
+    })
+    save_data(data)
+    return jsonify(data['reminders'])
+
+
+@app.route('/api/reminders/<int:reminder_id>', methods=['DELETE'])
+@login_required
+def delete_reminder(reminder_id):
+    data = load_data()
+    data['reminders'] = [r for r in data.get('reminders', []) if r['id'] != reminder_id]
+    save_data(data)
+    return jsonify(data['reminders'])
+
+
+@app.route('/api/reminders/<int:reminder_id>/toggle', methods=['POST'])
+@login_required
+def toggle_reminder(reminder_id):
+    data = load_data()
+    for r in data.get('reminders', []):
+        if r['id'] == reminder_id:
+            r['active'] = not r.get('active', True)
+            break
+    save_data(data)
+    return jsonify(data['reminders'])
+
+
+# ── Habits API ─────────────────────────────────────────────────────────────────
+
+@app.route('/api/habits', methods=['POST'])
+@login_required
+@rate_limit(20, 60)
+def add_habit():
+    body = request.get_json(silent=True)
+    if not body or not body.get('name', '').strip():
+        return jsonify({'error': 'Alışkanlık adı zorunludur.'}), 400
+    data = load_data()
+    if 'habits' not in data:
+        data['habits'] = []
+    new_id = max((h['id'] for h in data['habits']), default=0) + 1
+    data['habits'].append({
+        'id': new_id,
+        'name': body['name'].strip(),
+        'emoji': body.get('emoji', '✅'),
+        'checks': {},
+    })
+    save_data(data)
+    return jsonify(data['habits'])
+
+
+@app.route('/api/habits/<int:habit_id>', methods=['DELETE'])
+@login_required
+def delete_habit(habit_id):
+    data = load_data()
+    data['habits'] = [h for h in data.get('habits', []) if h['id'] != habit_id]
+    save_data(data)
+    return jsonify(data['habits'])
+
+
+@app.route('/api/habits/<int:habit_id>/check', methods=['POST'])
+@login_required
+def check_habit(habit_id):
+    from datetime import date
+    today = date.today().isoformat()
+    data = load_data()
+    for h in data.get('habits', []):
+        if h['id'] == habit_id:
+            if 'checks' not in h:
+                h['checks'] = {}
+            if h['checks'].get(today):
+                del h['checks'][today]
+            else:
+                h['checks'][today] = True
+            break
+    save_data(data)
+    return jsonify(data['habits'])
+
+
+# ── Weather ────────────────────────────────────────────────────────────────────
 
 weather_cache = {}
 
@@ -360,8 +511,8 @@ def fetch_weather_data(city):
 
 @app.route('/api/weather')
 @login_required
+@rate_limit(10, 60)
 def get_weather():
-    import time
     city = request.args.get('city', 'Istanbul')
     now  = time.time()
 
@@ -386,7 +537,7 @@ def get_weather():
     return jsonify({'error': str(last_error)}), 500
 
 
-# ── Spotify ───────────────────────────────────────────────────────────────────
+# ── Spotify ────────────────────────────────────────────────────────────────────
 
 @app.route('/spotify/login')
 @login_required
@@ -398,6 +549,13 @@ def spotify_login():
         'scope':         SPOTIFY_SCOPES,
     })
     return redirect(f'https://accounts.spotify.com/authorize?{params}')
+
+
+@app.route('/spotify/disconnect')
+@login_required
+def spotify_disconnect():
+    clear_spotify_tokens()
+    return redirect('/')
 
 
 @app.route('/callback')
@@ -501,7 +659,7 @@ def get_spotify():
         return jsonify({'connected': True, 'playing': False})
 
 
-# ── Startup ───────────────────────────────────────────────────────────────────
+# ── Startup ────────────────────────────────────────────────────────────────────
 
 init_db()
 
