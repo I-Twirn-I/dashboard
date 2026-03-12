@@ -606,6 +606,18 @@
                 </div>
             </div>
 
+            <!-- Piyasalar -->
+            <div class="card" data-card="rates">
+                <span class="card-drag-handle" title="Taşı">⠿</span>
+                <div class="card-header">
+                    <span class="card-title">📈 Piyasalar</span>
+                    <span id="rates-updated" style="font-size:0.72rem;color:var(--text-muted);"></span>
+                </div>
+                <div id="rates-list">
+                    <div style="font-size:0.85rem;color:var(--text-muted);text-align:center;padding:16px;">Yükleniyor...</div>
+                </div>
+            </div>
+
         </div><!-- /grid -->
         </div><!-- /main-content -->
 
@@ -627,15 +639,6 @@
                 </div>
                 <button class="btn-small" onclick="addReminder()" style="width:100%">+ Ekle</button>
             </div>
-        </div>
-
-        <!-- Döviz / Kripto / Altın -->
-        <div class="rates-widget" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
-            <div class="rates-title">📈 Piyasalar</div>
-            <div id="rates-list">
-                <div style="font-size:0.82rem;color:var(--text-muted);text-align:center;padding:8px;">Yükleniyor...</div>
-            </div>
-            <div class="rates-updated" id="rates-updated"></div>
         </div>
 
         </div><!-- /main-layout -->
@@ -1292,8 +1295,8 @@
                         </div>`;
                 }).join('');
                 const now = new Date();
-                document.getElementById('rates-updated').textContent =
-                    `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} güncellendi`;
+                const el = document.getElementById('rates-updated');
+                if (el) el.textContent = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} güncellendi`;
             } catch {}
         }
 
