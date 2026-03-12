@@ -477,7 +477,7 @@
             else if (h < 12) { greeting = 'Günaydın';    sub = 'Yeni bir gün, yeni fırsatlar ☀️'; }
             else if (h < 18) { greeting = 'İyi öğlenler'; sub = 'Bugün neler yapacaksın? 🚀'; }
             else             { greeting = 'İyi akşamlar'; sub = 'Harika bir akşam geçir ✨'; }
-            document.getElementById('greeting-text').innerHTML = `${greeting}, <span>Kuzey</span>`;
+            document.getElementById('greeting-text').innerHTML = `${greeting}, <span>{{ username }}</span>`;
             document.getElementById('greeting-sub').textContent = sub;
         }
 
