@@ -69,7 +69,15 @@
             transition: background var(--transition), color var(--transition);
         }
 
-        .container { max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+        /* ── Layout ── */
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .main-content { flex: 1; min-width: 0; }
 
         /* ── Header ── */
         .header {
@@ -176,8 +184,16 @@
             outline: none;
             transition: border-color 0.2s;
             width: 100%;
+            color-scheme: dark;
         }
+        [data-theme="light"] input[type="text"],
+        [data-theme="light"] input[type="time"],
+        [data-theme="light"] select { color-scheme: light; }
         input[type="text"]:focus, input[type="time"]:focus, select:focus { border-color: var(--accent); }
+        select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
 
         button {
             background: var(--accent);
@@ -320,8 +336,25 @@
         .pomodoro-btn.reset { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); }
         .pomodoro-btn.reset:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 
-        /* ── Reminders card ── */
-        .reminders-card { grid-column: span 1; }
+        /* ── Reminders sidebar ── */
+        .reminders-sidebar {
+            width: 260px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .reminders-sidebar::-webkit-scrollbar { width: 4px; }
+        .reminders-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .reminders-sidebar .card-title { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-secondary); }
         .reminder-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
         .reminder-list::-webkit-scrollbar { width: 4px; }
         .reminder-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -362,45 +395,6 @@
             50% { box-shadow: 0 0 16px var(--accent-glow); }
         }
 
-        /* ── Habits card ── */
-        .habits-card { grid-column: span 1; }
-        .habit-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
-        .habit-list::-webkit-scrollbar { width: 4px; }
-        .habit-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-        .habit-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 12px; border-radius: var(--radius-sm);
-            background: var(--bg-input); border: 1px solid transparent;
-            transition: all 0.2s;
-        }
-        .habit-item:hover { border-color: var(--border-hover); }
-        .habit-item.checked-today { border-color: var(--success); background: var(--success-soft); }
-        .habit-emoji { font-size: 1.3rem; flex-shrink: 0; }
-        .habit-name { font-size: 0.88rem; flex: 1; font-weight: 500; }
-        .habit-streak {
-            font-size: 0.72rem; color: var(--text-muted);
-            font-family: var(--font-mono); flex-shrink: 0;
-        }
-        .habit-streak.hot { color: #f97316; }
-        .habit-check-btn {
-            background: var(--bg-card); border: 1px solid var(--border);
-            color: var(--text-secondary); padding: 5px 10px;
-            font-size: 0.78rem; border-radius: 6px; flex-shrink: 0;
-        }
-        .habit-item.checked-today .habit-check-btn {
-            background: var(--success); color: white; border-color: var(--success);
-        }
-        .habit-check-btn:hover { transform: none; opacity: 0.85; }
-        .habit-delete {
-            background: none; border: none; padding: 3px 6px;
-            font-size: 0.8rem; color: var(--text-muted);
-            opacity: 0; transition: all 0.2s; border-radius: 4px;
-        }
-        .habit-item:hover .habit-delete { opacity: 1; }
-        .habit-delete:hover { background: var(--danger-soft); color: var(--danger); transform: none; }
-        .habit-empty { font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 16px; }
-        .add-habit-form { display: flex; gap: 8px; }
-        .add-habit-form input:first-child { max-width: 64px; }
 
         /* ── Spotify widget ── */
         .spotify-widget {
@@ -445,8 +439,14 @@
         @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(20px); } }
 
         /* ── Responsive / Mobile ── */
-        @media (max-width: 1024px) {
+        @media (max-width: 1100px) {
             .grid { grid-template-columns: repeat(2, 1fr); }
+            .reminders-sidebar { width: 220px; }
+        }
+
+        @media (max-width: 768px) {
+            .main-layout { flex-direction: column; }
+            .reminders-sidebar { width: 100%; position: static; max-height: none; }
         }
 
         @media (max-width: 640px) {
@@ -484,6 +484,8 @@
             </div>
         </div>
 
+        <div class="main-layout">
+        <div class="main-content">
         <div class="grid" id="main-grid">
 
             <!-- Saat -->
@@ -590,44 +592,31 @@
                 </div>
             </div>
 
-            <!-- Hatırlatıcılar -->
-            <div class="card reminders-card" data-card="reminders">
-                <span class="card-drag-handle" title="Taşı">⠿</span>
-                <div class="card-header">
-                    <span class="card-title">Hatırlatıcılar</span>
-                    <span id="reminder-count" style="font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);"></span>
-                </div>
-                <div class="reminder-list" id="reminder-list"></div>
-                <div class="add-reminder-form">
-                    <input type="text" id="rem-title" placeholder="Hatırlatıcı başlığı..." />
-                    <div class="row">
-                        <input type="time" id="rem-time" />
-                        <select id="rem-repeat">
-                            <option value="daily">Her gün</option>
-                            <option value="once">Bir kez</option>
-                        </select>
-                        <button class="btn-small" onclick="addReminder()">+ Ekle</button>
-                    </div>
-                </div>
-            </div>
+        </div><!-- /grid -->
+        </div><!-- /main-content -->
 
-            <!-- Alışkanlıklar -->
-            <div class="card habits-card" data-card="habits">
-                <span class="card-drag-handle" title="Taşı">⠿</span>
-                <div class="card-header">
-                    <span class="card-title">Alışkanlıklar</span>
-                    <span id="habit-today" style="font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);"></span>
-                </div>
-                <div class="habit-list" id="habit-list"></div>
-                <div class="add-habit-form">
-                    <input type="text" id="habit-emoji" placeholder="✅" maxlength="4" />
-                    <input type="text" id="habit-name" placeholder="Alışkanlık adı..." onkeydown="if(event.key==='Enter')addHabit()" />
-                    <button class="btn-small" onclick="addHabit()">+ Ekle</button>
-                </div>
+        <!-- Hatırlatıcılar Sidebar -->
+        <div class="reminders-sidebar">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span class="card-title">🔔 Hatırlatıcılar</span>
+                <span id="reminder-count" style="font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);"></span>
             </div>
-
+            <div class="reminder-list" id="reminder-list"></div>
+            <div class="add-reminder-form">
+                <input type="text" id="rem-title" placeholder="Hatırlatıcı başlığı..." />
+                <div class="row">
+                    <input type="time" id="rem-time" />
+                    <select id="rem-repeat">
+                        <option value="daily">Her gün</option>
+                        <option value="once">Bir kez</option>
+                    </select>
+                </div>
+                <button class="btn-small" onclick="addReminder()" style="width:100%">+ Ekle</button>
+            </div>
         </div>
-    </div>
+
+        </div><!-- /main-layout -->
+    </div><!-- /container -->
 
     <script>
         let appData = {};
@@ -679,7 +668,6 @@
             renderTodos();
             renderBookmarks();
             renderReminders();
-            renderHabits();
             document.getElementById('notes-area').value = appData.notes || '';
             document.getElementById('city-input').value = appData.city || 'Istanbul';
             fetchWeather(appData.city || 'Istanbul');
@@ -1097,12 +1085,12 @@
             const hh = String(now.getHours()).padStart(2, '0');
             const mm = String(now.getMinutes()).padStart(2, '0');
             const currentTime = `${hh}:${mm}`;
-            const todayKey = now.toISOString().slice(0, 10);
+            const todayStr = now.toISOString().slice(0, 10);
 
             (appData.reminders || []).forEach(r => {
                 if (!r.active) return;
                 if (r.time !== currentTime) return;
-                const fireKey = `${r.id}-${todayKey}`;
+                const fireKey = `${r.id}-${todayStr}`;
                 if (_firedToday.has(fireKey)) return;
                 _firedToday.add(fireKey);
                 fireReminder(r);
@@ -1148,81 +1136,8 @@
             } catch {}
         }
 
-        // ── Habits ─────────────────────────────────────────────────────────────
         function todayKey() {
             return new Date().toISOString().slice(0, 10);
-        }
-
-        function getStreak(checks) {
-            let streak = 0;
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            // Eğer bugün işaretlenmişse bugünden başla, yoksa dünden
-            const startFromToday = checks[d.toISOString().slice(0, 10)];
-            if (!startFromToday) d.setDate(d.getDate() - 1);
-            while (true) {
-                const key = d.toISOString().slice(0, 10);
-                if (!checks[key]) break;
-                streak++;
-                d.setDate(d.getDate() - 1);
-            }
-            return streak;
-        }
-
-        function renderHabits() {
-            const list = document.getElementById('habit-list');
-            const habits = appData.habits || [];
-            const today = todayKey();
-            const checkedToday = habits.filter(h => h.checks && h.checks[today]).length;
-            document.getElementById('habit-today').textContent = habits.length > 0 ? `${checkedToday}/${habits.length} bugün` : '';
-
-            if (habits.length === 0) {
-                list.innerHTML = '<div class="habit-empty">Alışkanlık ekle ve her gün takip et 💪</div>';
-                return;
-            }
-            list.innerHTML = habits.map(h => {
-                const isChecked = h.checks && h.checks[today];
-                const streak = getStreak(h.checks || {});
-                return `
-                    <div class="habit-item ${isChecked ? 'checked-today' : ''}">
-                        <span class="habit-emoji">${h.emoji || '✅'}</span>
-                        <span class="habit-name">${escapeHtml(h.name)}</span>
-                        <span class="habit-streak ${streak >= 3 ? 'hot' : ''}">${streak > 0 ? `🔥${streak}` : ''}</span>
-                        <button class="habit-check-btn" onclick="toggleHabit(${h.id})">${isChecked ? '✓ Tamam' : 'Yap'}</button>
-                        <button class="habit-delete" onclick="deleteHabit(${h.id})">✕</button>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function addHabit() {
-            const emoji = document.getElementById('habit-emoji').value.trim() || '✅';
-            const name  = document.getElementById('habit-name').value.trim();
-            if (!name) { showToast('Alışkanlık adı zorunludur.', 'error'); return; }
-            const id = nextId(appData.habits || []);
-            appData.habits = [...(appData.habits || []), { id, name, emoji, checks: {} }];
-            document.getElementById('habit-emoji').value = '';
-            document.getElementById('habit-name').value = '';
-            renderHabits();
-            bgSave('/api/habits', 'POST', { emoji, name });
-        }
-
-        function deleteHabit(id) {
-            appData.habits = (appData.habits || []).filter(h => h.id !== id);
-            renderHabits();
-            bgSave(`/api/habits/${id}`, 'DELETE');
-        }
-
-        function toggleHabit(id) {
-            const today = todayKey();
-            const h = (appData.habits || []).find(h => h.id === id);
-            if (h) {
-                if (!h.checks) h.checks = {};
-                if (h.checks[today]) delete h.checks[today];
-                else h.checks[today] = true;
-            }
-            renderHabits();
-            bgSave(`/api/habits/${id}/check`);
         }
 
         // ── Drag-and-drop ──────────────────────────────────────────────────────
