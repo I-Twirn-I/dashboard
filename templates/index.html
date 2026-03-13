@@ -387,11 +387,13 @@
         .pomodoro-stats {
             display: flex; gap: 8px; margin-top: 14px;
         }
+        .pomodoro-stats + .pomodoro-stats { margin-top: 8px; }
         .pomo-stat {
             flex: 1; background: var(--bg-input); border-radius: var(--radius-sm);
             padding: 8px 10px; text-align: center;
         }
         .pomo-stat-val { font-family: var(--font-mono); font-size: 1rem; font-weight: 600; color: var(--accent); }
+        .pomo-stat-val.weekly { color: var(--success); }
         .pomo-stat-lbl { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.8px; }
 
         /* ── Reminders card ── */
@@ -657,7 +659,17 @@
                     </div>
                     <div class="pomo-stat">
                         <div class="pomo-stat-val" id="pomo-total-time">0 dk</div>
-                        <div class="pomo-stat-lbl">Toplam Çalışma</div>
+                        <div class="pomo-stat-lbl">Bugün Çalışma</div>
+                    </div>
+                </div>
+                <div class="pomodoro-stats">
+                    <div class="pomo-stat">
+                        <div class="pomo-stat-val weekly" id="pomo-week-sessions">0</div>
+                        <div class="pomo-stat-lbl">Bu Hafta</div>
+                    </div>
+                    <div class="pomo-stat">
+                        <div class="pomo-stat-val weekly" id="pomo-week-time">0 dk</div>
+                        <div class="pomo-stat-lbl">Haftalık Çalışma</div>
                     </div>
                 </div>
             </div>
@@ -1024,6 +1036,13 @@
         let pomoIsBreak = false;
         let pomoEndTime = null;
 
+        function getISOWeek() {
+            const d = new Date();
+            const jan4 = new Date(d.getFullYear(), 0, 4);
+            const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+            return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+        }
+
         function getPomoStats() {
             const today = new Date().toISOString().slice(0, 10);
             const raw = localStorage.getItem('pomo_stats');
@@ -1036,12 +1055,30 @@
             localStorage.setItem('pomo_stats', JSON.stringify(stats));
         }
 
+        function getPomoWeekStats() {
+            const week = getISOWeek();
+            const raw = localStorage.getItem('pomo_week_stats');
+            const data = raw ? JSON.parse(raw) : {};
+            if (data.week !== week) return { week, sessions: 0, minutes: 0 };
+            return data;
+        }
+
+        function savePomoWeekStats(stats) {
+            localStorage.setItem('pomo_week_stats', JSON.stringify(stats));
+        }
+
+        function fmtMins(mins) {
+            const h = Math.floor(mins / 60), m = mins % 60;
+            return h > 0 ? `${h}s ${m}dk` : `${m} dk`;
+        }
+
         function updatePomoStats() {
             const stats = getPomoStats();
             document.getElementById('pomo-sessions').textContent = stats.sessions;
-            const h = Math.floor(stats.minutes / 60);
-            const m = stats.minutes % 60;
-            document.getElementById('pomo-total-time').textContent = h > 0 ? `${h}s ${m}dk` : `${m} dk`;
+            document.getElementById('pomo-total-time').textContent = fmtMins(stats.minutes);
+            const week = getPomoWeekStats();
+            document.getElementById('pomo-week-sessions').textContent = week.sessions;
+            document.getElementById('pomo-week-time').textContent = fmtMins(week.minutes);
         }
 
         function recordPomoSession() {
@@ -1049,6 +1086,10 @@
             stats.sessions += 1;
             stats.minutes += 25;
             savePomoStats(stats);
+            const week = getPomoWeekStats();
+            week.sessions += 1;
+            week.minutes += 25;
+            savePomoWeekStats(week);
             updatePomoStats();
         }
 
