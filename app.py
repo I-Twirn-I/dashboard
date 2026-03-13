@@ -529,18 +529,31 @@ def get_rates():
     except Exception as e:
         print(f"Forex fetch failed: {e}", flush=True)
 
-    # Kripto: BTC/USD ve ETH/USD (CoinCap — no key required)
+    # BTC/USD — blockchain.info (primary) → coincap (fallback)
     try:
-        cap = open_url('https://api.coincap.io/v2/assets?ids=bitcoin,ethereum')
-        for asset in cap.get('data', []):
-            if asset['id'] == 'bitcoin':
-                result['BTC/USD'] = round(float(asset['priceUsd']), 0)
-            elif asset['id'] == 'ethereum':
-                result['ETH/USD'] = round(float(asset['priceUsd']), 2)
+        btc = open_url('https://blockchain.info/ticker')
+        result['BTC/USD'] = round(float(btc['USD']['last']), 0)
     except Exception as e:
-        print(f"Crypto fetch failed (coincap): {e}", flush=True)
+        print(f"BTC fetch failed (blockchain.info): {e}", flush=True)
+        try:
+            d = open_url('https://api.coincap.io/v2/assets/bitcoin')
+            result['BTC/USD'] = round(float(d['data']['priceUsd']), 0)
+        except Exception as e2:
+            print(f"BTC fetch failed (coincap): {e2}", flush=True)
 
-    # Gram Altın (TRY) — metals.live → frankfurter XAU fallback
+    # ETH/USD — coincap (primary) → cryptocompare (fallback)
+    try:
+        d = open_url('https://api.coincap.io/v2/assets/ethereum')
+        result['ETH/USD'] = round(float(d['data']['priceUsd']), 2)
+    except Exception as e:
+        print(f"ETH fetch failed (coincap): {e}", flush=True)
+        try:
+            d = open_url('https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD')
+            result['ETH/USD'] = round(float(d['USD']), 2)
+        except Exception as e2:
+            print(f"ETH fetch failed (cryptocompare): {e2}", flush=True)
+
+    # Gram Altın (TRY) — metals.live → goldprice.org
     try:
         gold_data = open_url('https://api.metals.live/v1/spot')
         gold_oz_usd = float(gold_data[0]['gold'])
@@ -549,7 +562,6 @@ def get_rates():
     except Exception as e:
         print(f"Gold fetch failed (metals.live): {e}", flush=True)
         try:
-            # Fallback: goldprice.org public endpoint
             gp = open_url('https://data-asg.goldprice.org/dbXRates/USD')
             gold_oz_usd = float(gp['items'][0]['xauPrice'])
             usd_try = result.get('_usd_try', 1)

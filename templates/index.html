@@ -384,6 +384,15 @@
         .pomodoro-btn { flex: 1; max-width: 120px; }
         .pomodoro-btn.reset { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); }
         .pomodoro-btn.reset:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .pomodoro-stats {
+            display: flex; gap: 8px; margin-top: 14px;
+        }
+        .pomo-stat {
+            flex: 1; background: var(--bg-input); border-radius: var(--radius-sm);
+            padding: 8px 10px; text-align: center;
+        }
+        .pomo-stat-val { font-family: var(--font-mono); font-size: 1rem; font-weight: 600; color: var(--accent); }
+        .pomo-stat-lbl { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.8px; }
 
         /* ── Reminders card ── */
         .reminder-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
@@ -641,6 +650,16 @@
                     <button class="pomodoro-btn start" id="pomo-start" onclick="pomodoroToggle()">▶ Başlat</button>
                     <button class="pomodoro-btn reset" onclick="pomodoroReset()">↺ Sıfırla</button>
                 </div>
+                <div class="pomodoro-stats">
+                    <div class="pomo-stat">
+                        <div class="pomo-stat-val" id="pomo-sessions">0</div>
+                        <div class="pomo-stat-lbl">Bugün</div>
+                    </div>
+                    <div class="pomo-stat">
+                        <div class="pomo-stat-val" id="pomo-total-time">0 dk</div>
+                        <div class="pomo-stat-lbl">Toplam Çalışma</div>
+                    </div>
+                </div>
             </div>
 
         </div><!-- /grid -->
@@ -739,6 +758,7 @@
             fetchWeather(appData.city || 'Istanbul');
             renderCalendar();
             updatePomoUI();
+            updatePomoStats();
             applyCardOrder(appData.card_order || []);
             initSortable();
             requestNotifPermission();
@@ -1004,6 +1024,34 @@
         let pomoIsBreak = false;
         let pomoEndTime = null;
 
+        function getPomoStats() {
+            const today = new Date().toISOString().slice(0, 10);
+            const raw = localStorage.getItem('pomo_stats');
+            const data = raw ? JSON.parse(raw) : {};
+            if (data.date !== today) return { date: today, sessions: 0, minutes: 0 };
+            return data;
+        }
+
+        function savePomoStats(stats) {
+            localStorage.setItem('pomo_stats', JSON.stringify(stats));
+        }
+
+        function updatePomoStats() {
+            const stats = getPomoStats();
+            document.getElementById('pomo-sessions').textContent = stats.sessions;
+            const h = Math.floor(stats.minutes / 60);
+            const m = stats.minutes % 60;
+            document.getElementById('pomo-total-time').textContent = h > 0 ? `${h}s ${m}dk` : `${m} dk`;
+        }
+
+        function recordPomoSession() {
+            const stats = getPomoStats();
+            stats.sessions += 1;
+            stats.minutes += 25;
+            savePomoStats(stats);
+            updatePomoStats();
+        }
+
         function updatePomoUI() {
             const m = String(Math.floor(pomoSeconds / 60)).padStart(2, '0');
             const s = String(pomoSeconds % 60).padStart(2, '0');
@@ -1020,10 +1068,12 @@
             if (remaining <= 0) {
                 clearInterval(pomoInterval);
                 pomoRunning = false;
+                const wasWork = !pomoIsBreak;
                 pomoIsBreak = !pomoIsBreak;
                 pomoSeconds = pomoIsBreak ? POMO_BREAK : POMO_WORK;
                 pomoTotal = pomoSeconds;
                 document.getElementById('pomo-start').textContent = '▶ Başlat';
+                if (wasWork) recordPomoSession();
                 playPomoSound();
                 flashPomoCard();
             } else {
