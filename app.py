@@ -541,27 +541,30 @@ def get_rates():
         except Exception as e2:
             print(f"BTC fetch failed (coincap): {e2}", flush=True)
 
-    # ETH/USD + XAU/USD — Kraken public API (no key, reliable)
+    def yahoo_price(symbol):
+        url = f'https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}'
+        d = open_url(url)
+        return float(d['chart']['result'][0]['meta']['regularMarketPrice'])
+
+    # ETH/USD — Yahoo Finance (primary) → Kraken (fallback)
     try:
-        kraken = open_url('https://api.kraken.com/0/public/Ticker?pair=ETHUSD,XAUUSD')
-        kr = kraken.get('result', {})
-        eth_key = next((k for k in kr if 'ETH' in k and 'USD' in k), None)
-        xau_key = next((k for k in kr if 'XAU' in k and 'USD' in k), None)
-        if eth_key:
-            result['ETH/USD'] = round(float(kr[eth_key]['c'][0]), 2)
-        if xau_key:
-            gold_oz_usd = float(kr[xau_key]['c'][0])
-            usd_try = result.get('_usd_try', 1)
-            result['Gram Altın'] = round((gold_oz_usd / 31.1035) * usd_try, 2)
+        result['ETH/USD'] = round(yahoo_price('ETH-USD'), 2)
     except Exception as e:
-        print(f"Kraken fetch failed: {e}", flush=True)
-        # ETH fallback: coincap
+        print(f"ETH fetch failed (yahoo): {e}", flush=True)
         try:
-            d = open_url('https://api.coincap.io/v2/assets/ethereum')
-            result['ETH/USD'] = round(float(d['data']['priceUsd']), 2)
+            kr = open_url('https://api.kraken.com/0/public/Ticker?pair=ETHUSD')
+            key = next(k for k in kr['result'] if 'ETH' in k)
+            result['ETH/USD'] = round(float(kr['result'][key]['c'][0]), 2)
         except Exception as e2:
-            print(f"ETH fetch failed (coincap): {e2}", flush=True)
-        # Gold fallback: metals.live
+            print(f"ETH fetch failed (kraken): {e2}", flush=True)
+
+    # Gram Altın — Yahoo Finance GC=F (primary) → metals.live (fallback)
+    try:
+        gold_oz_usd = yahoo_price('GC=F')
+        usd_try = result.get('_usd_try', 1)
+        result['Gram Altın'] = round((gold_oz_usd / 31.1035) * usd_try, 2)
+    except Exception as e:
+        print(f"Gold fetch failed (yahoo): {e}", flush=True)
         try:
             gd = open_url('https://api.metals.live/v1/spot')
             gold_oz_usd = float(gd[0]['gold'])
@@ -637,6 +640,44 @@ def fetch_weather_data(city):
     }
 
 
+def fetch_weather_openmeteo(city):
+    """Fallback: Open-Meteo (free, no key). Geocodes city first."""
+    geo = open_url(f'https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=tr&format=json')
+    loc = geo['results'][0]
+    lat, lon = loc['latitude'], loc['longitude']
+    city_name = loc.get('name', city)
+    wx = open_url(
+        f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}'
+        f'&current=temperature_2m,apparent_temperature,relative_humidity_2m,'
+        f'wind_speed_10m,weather_code&wind_speed_unit=kmh'
+    )
+    cur = wx['current']
+    temp       = int(round(cur['temperature_2m']))
+    feels_like = int(round(cur['apparent_temperature']))
+    humidity   = int(cur['relative_humidity_2m'])
+    wind       = int(round(cur['wind_speed_10m']))
+    code       = int(cur['weather_code'])
+
+    # WMO weather codes → description
+    WMO = {
+        0: ('Açık', '☀️', 'sunny'),
+        1: ('Az bulutlu', '🌤️', 'cloudy'), 2: ('Parçalı bulutlu', '⛅', 'cloudy'),
+        3: ('Kapalı', '☁️', 'cloudy'),
+        45: ('Sisli', '🌫️', 'cloudy'), 48: ('Sisli', '🌫️', 'cloudy'),
+        51: ('Çisenti', '🌦️', 'rainy'), 53: ('Çisenti', '🌦️', 'rainy'), 55: ('Çisenti', '🌦️', 'rainy'),
+        61: ('Yağmurlu', '🌧️', 'rainy'), 63: ('Yağmurlu', '🌧️', 'rainy'), 65: ('Yağmurlu', '🌧️', 'rainy'),
+        71: ('Karlı', '🌨️', 'snowy'), 73: ('Karlı', '🌨️', 'snowy'), 75: ('Karlı', '🌨️', 'snowy'),
+        80: ('Sağanak', '🌧️', 'rainy'), 81: ('Sağanak', '🌧️', 'rainy'), 82: ('Sağanak', '🌧️', 'rainy'),
+        95: ('Fırtınalı', '⛈️', 'stormy'), 96: ('Dolu', '⛈️', 'stormy'), 99: ('Dolu', '⛈️', 'stormy'),
+    }
+    desc, icon, anim_type = WMO.get(code, ('Parçalı bulutlu', '⛅', 'cloudy'))
+    return {
+        'city': city_name, 'temp': temp, 'feels_like': feels_like,
+        'humidity': humidity, 'wind': wind,
+        'desc': desc, 'icon': icon, 'anim_type': anim_type,
+    }
+
+
 @app.route('/api/weather')
 @login_required
 @rate_limit(10, 60)
@@ -647,22 +688,21 @@ def get_weather():
     if city in weather_cache and now - weather_cache[city]['time'] < 600:
         return jsonify(weather_cache[city]['data'])
 
-    last_error = None
-    for attempt in range(2):
+    # Try wttr.in first, then Open-Meteo as fallback
+    for fetcher in (fetch_weather_data, fetch_weather_openmeteo):
         try:
-            result = fetch_weather_data(city)
+            result = fetcher(city)
             weather_cache[city] = {'data': result, 'time': now}
             return jsonify(result)
         except Exception as e:
-            last_error = e
-            print(f"Weather fetch attempt {attempt+1} failed: {type(e).__name__}: {e}", flush=True)
+            print(f"Weather fetch failed ({fetcher.__name__}): {type(e).__name__}: {e}", flush=True)
 
     if city in weather_cache:
         stale = dict(weather_cache[city]['data'])
         stale['stale'] = True
         return jsonify(stale)
 
-    return jsonify({'error': str(last_error)}), 500
+    return jsonify({'error': 'Hava durumu alınamadı'}), 500
 
 
 # ── Spotify ────────────────────────────────────────────────────────────────────
