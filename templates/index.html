@@ -277,6 +277,16 @@
         .clock-date { font-size: 0.9rem; color: var(--text-secondary); margin-top: 8px; font-weight: 300; }
         .clock-secondary-time { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 400; color: var(--text-secondary); }
         .clock-secondary-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; text-align: right; }
+        .clock-settings-panel {
+            display: none; margin-top: 14px; padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+        .clock-settings-panel.open { display: block; }
+        .clock-settings-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;
+        }
+        .clock-settings-row label { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 3px; display: block; text-transform: uppercase; letter-spacing: 0.8px; }
+        .clock-settings-panel .save-btn { width: 100%; margin-top: 4px; }
 
         .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .calendar-month { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
@@ -555,7 +565,10 @@
                 <span class="card-drag-handle" title="Taşı">⠿</span>
                 <div class="card-header">
                     <span class="card-title">Saat</span>
-                    <button class="calendar-nav" onclick="swapClocks()" title="Yer değiştir">⇄</button>
+                    <div style="display:flex;gap:4px;">
+                        <button class="calendar-nav" onclick="swapClocks()" title="Yer değiştir">⇄</button>
+                        <button class="calendar-nav" onclick="toggleClockSettings()" title="Saat ayarları" id="clock-settings-btn">⚙</button>
+                    </div>
                 </div>
                 <div style="display:flex; align-items:flex-start; justify-content:space-between;">
                     <div>
@@ -566,6 +579,63 @@
                         <div class="clock-secondary-time" id="clock-secondary">--:--</div>
                         <div class="clock-secondary-label" id="secondary-label">Stuttgart</div>
                     </div>
+                </div>
+                <div class="clock-settings-panel" id="clock-settings-panel">
+                    <div class="clock-settings-row">
+                        <div>
+                            <label>1. Saat — Şehir adı</label>
+                            <input type="text" id="tz1-label" placeholder="İstanbul" />
+                        </div>
+                        <div>
+                            <label>Zaman dilimi</label>
+                            <select id="tz1-zone">
+                                <option value="Europe/Istanbul">Türkiye (UTC+3)</option>
+                                <option value="Europe/London">Londra (UTC+0/1)</option>
+                                <option value="Europe/Berlin">Almanya (UTC+1/2)</option>
+                                <option value="Europe/Paris">Paris (UTC+1/2)</option>
+                                <option value="Europe/Moscow">Moskova (UTC+3)</option>
+                                <option value="Europe/Amsterdam">Amsterdam (UTC+1/2)</option>
+                                <option value="America/New_York">New York (UTC-5/-4)</option>
+                                <option value="America/Chicago">Chicago (UTC-6/-5)</option>
+                                <option value="America/Los_Angeles">Los Angeles (UTC-8/-7)</option>
+                                <option value="America/Sao_Paulo">São Paulo (UTC-3)</option>
+                                <option value="Asia/Dubai">Dubai (UTC+4)</option>
+                                <option value="Asia/Kolkata">Hindistan (UTC+5:30)</option>
+                                <option value="Asia/Tokyo">Tokyo (UTC+9)</option>
+                                <option value="Asia/Shanghai">Şangay (UTC+8)</option>
+                                <option value="Asia/Seoul">Seul (UTC+9)</option>
+                                <option value="Australia/Sydney">Sidney (UTC+10/11)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="clock-settings-row">
+                        <div>
+                            <label>2. Saat — Şehir adı</label>
+                            <input type="text" id="tz2-label" placeholder="Stuttgart" />
+                        </div>
+                        <div>
+                            <label>Zaman dilimi</label>
+                            <select id="tz2-zone">
+                                <option value="Europe/Istanbul">Türkiye (UTC+3)</option>
+                                <option value="Europe/London">Londra (UTC+0/1)</option>
+                                <option value="Europe/Berlin">Almanya (UTC+1/2)</option>
+                                <option value="Europe/Paris">Paris (UTC+1/2)</option>
+                                <option value="Europe/Moscow">Moskova (UTC+3)</option>
+                                <option value="Europe/Amsterdam">Amsterdam (UTC+1/2)</option>
+                                <option value="America/New_York">New York (UTC-5/-4)</option>
+                                <option value="America/Chicago">Chicago (UTC-6/-5)</option>
+                                <option value="America/Los_Angeles">Los Angeles (UTC-8/-7)</option>
+                                <option value="America/Sao_Paulo">São Paulo (UTC-3)</option>
+                                <option value="Asia/Dubai">Dubai (UTC+4)</option>
+                                <option value="Asia/Kolkata">Hindistan (UTC+5:30)</option>
+                                <option value="Asia/Tokyo">Tokyo (UTC+9)</option>
+                                <option value="Asia/Shanghai">Şangay (UTC+8)</option>
+                                <option value="Asia/Seoul">Seul (UTC+9)</option>
+                                <option value="Australia/Sydney">Sidney (UTC+10/11)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn-small save-btn" onclick="saveClockSettings()">✓ Kaydet</button>
                 </div>
                 <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
                     <div class="calendar-header">
@@ -788,10 +858,12 @@
         }
 
         // ── Clock ──────────────────────────────────────────────────────────────
-        let primaryTZ = 'Europe/Istanbul';
-        let secondaryTZ = 'Europe/Berlin';
-        let primaryLabel = 'İstanbul';
-        let secondaryLabel = 'Stuttgart';
+        const CLOCK_DEFAULT = { tz1: 'Europe/Istanbul', label1: 'İstanbul', tz2: 'Europe/Berlin', label2: 'Stuttgart' };
+        const _cs = JSON.parse(localStorage.getItem('clock_settings') || 'null') || CLOCK_DEFAULT;
+        let primaryTZ = _cs.tz1;
+        let secondaryTZ = _cs.tz2;
+        let primaryLabel = _cs.label1;
+        let secondaryLabel = _cs.label2;
 
         function getTime(tz) {
             const now = new Date();
@@ -818,6 +890,30 @@
             [primaryTZ, secondaryTZ] = [secondaryTZ, primaryTZ];
             [primaryLabel, secondaryLabel] = [secondaryLabel, primaryLabel];
             updateClock();
+        }
+
+        function toggleClockSettings() {
+            const panel = document.getElementById('clock-settings-panel');
+            const isOpen = panel.classList.toggle('open');
+            if (isOpen) {
+                document.getElementById('tz1-label').value = primaryLabel;
+                document.getElementById('tz2-label').value = secondaryLabel;
+                document.getElementById('tz1-zone').value = primaryTZ;
+                document.getElementById('tz2-zone').value = secondaryTZ;
+            }
+        }
+
+        function saveClockSettings() {
+            const label1 = document.getElementById('tz1-label').value.trim() || 'Saat 1';
+            const tz1    = document.getElementById('tz1-zone').value;
+            const label2 = document.getElementById('tz2-label').value.trim() || 'Saat 2';
+            const tz2    = document.getElementById('tz2-zone').value;
+            primaryTZ = tz1; primaryLabel = label1;
+            secondaryTZ = tz2; secondaryLabel = label2;
+            localStorage.setItem('clock_settings', JSON.stringify({ tz1, label1, tz2, label2 }));
+            document.getElementById('clock-settings-panel').classList.remove('open');
+            updateClock();
+            showToast('Saat ayarları kaydedildi', 'success');
         }
 
         // ── Greeting ───────────────────────────────────────────────────────────
