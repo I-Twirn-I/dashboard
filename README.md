@@ -1,5 +1,7 @@
 # 🚀 Personal Dashboard
 
+🌐 **[Canlı Demo](https://dashboard-8rk5.onrender.com/)**
+
 Kişisel kullanım için geliştirilmiş, tek sayfadan oluşan bir **fullstack dashboard** uygulaması. Günlük hayatı kolaylaştırmak için birçok özelliği tek ekranda sunar.
 
 ---
@@ -35,14 +37,6 @@ Kişisel kullanım için geliştirilmiş, tek sayfadan oluşan bir **fullstack d
 - PostgreSQL
 
 ---
-
-## 📸 Ekran Görüntüsü
-
-![Dashboard](screenshot.png)
-
----
-
-
 
 ## 📄 Lisans
 
