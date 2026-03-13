@@ -529,15 +529,18 @@ def get_rates():
     except Exception as e:
         print(f"Forex fetch failed: {e}", flush=True)
 
-    # Kripto: BTC/USD ve ETH/USD (CoinGecko)
+    # Kripto: BTC/USD ve ETH/USD (CoinCap — no key required)
     try:
-        crypto = open_url('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd')
-        result['BTC/USD'] = round(float(crypto['bitcoin']['usd']), 0)
-        result['ETH/USD'] = round(float(crypto['ethereum']['usd']), 2)
+        cap = open_url('https://api.coincap.io/v2/assets?ids=bitcoin,ethereum')
+        for asset in cap.get('data', []):
+            if asset['id'] == 'bitcoin':
+                result['BTC/USD'] = round(float(asset['priceUsd']), 0)
+            elif asset['id'] == 'ethereum':
+                result['ETH/USD'] = round(float(asset['priceUsd']), 2)
     except Exception as e:
-        print(f"Crypto fetch failed: {e}", flush=True)
+        print(f"Crypto fetch failed (coincap): {e}", flush=True)
 
-    # Gram Altın (TRY) — metals.live with CoinGecko fallback
+    # Gram Altın (TRY) — metals.live → frankfurter XAU fallback
     try:
         gold_data = open_url('https://api.metals.live/v1/spot')
         gold_oz_usd = float(gold_data[0]['gold'])
@@ -546,16 +549,18 @@ def get_rates():
     except Exception as e:
         print(f"Gold fetch failed (metals.live): {e}", flush=True)
         try:
-            gold_data = open_url('https://api.coingecko.com/api/v3/simple/price?ids=gold&vs_currencies=usd')
-            gold_oz_usd = float(gold_data['gold']['usd'])
+            # Fallback: goldprice.org public endpoint
+            gp = open_url('https://data-asg.goldprice.org/dbXRates/USD')
+            gold_oz_usd = float(gp['items'][0]['xauPrice'])
             usd_try = result.get('_usd_try', 1)
             result['Gram Altın'] = round((gold_oz_usd / 31.1035) * usd_try, 2)
         except Exception as e2:
-            print(f"Gold fetch failed (coingecko): {e2}", flush=True)
+            print(f"Gold fetch failed (goldprice.org): {e2}", flush=True)
 
     result.pop('_usd_try', None)
+    # Only cache if we have a complete result; otherwise retry sooner
     _rates_cache['data'] = result
-    _rates_cache['time'] = now
+    _rates_cache['time'] = now if len(result) >= 5 else now - 240  # retry in 60s if incomplete
     return jsonify(result)
 
 

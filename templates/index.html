@@ -61,18 +61,30 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: var(--font-main);
             background: var(--bg-primary);
             color: var(--text-primary);
-            min-height: 100vh;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
             transition: background var(--transition), color var(--transition);
         }
 
         .container {
             max-width: 1600px;
+            width: 100%;
             margin: 0 auto;
             padding: 14px 32px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
         /* ── Header ── */
@@ -83,6 +95,7 @@
             margin-bottom: 12px;
             flex-wrap: wrap;
             gap: 10px;
+            flex-shrink: 0;
         }
 
         .greeting h1 { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 2px; }
@@ -120,16 +133,23 @@
         .main-layout {
             display: flex;
             gap: 14px;
-            align-items: flex-start;
+            flex: 1;
+            min-height: 0;
         }
 
         /* ── Grid ── */
         .grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: 1fr 1fr;
             gap: 14px;
             flex: 1;
             min-width: 0;
+        }
+
+        .grid .card {
+            display: flex;
+            flex-direction: column;
         }
 
         /* ── Right sidebar ── */
@@ -143,6 +163,9 @@
 
         .right-sidebar .card {
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
         .right-sidebar .reminders-card .reminder-list {
@@ -287,7 +310,9 @@
 
         /* ── Bookmarks card ── */
         .bookmarks-card { grid-column: span 1; }
-        .bookmarks-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+        .bookmarks-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; flex: 1; overflow-y: auto; min-height: 0; }
+        .bookmarks-grid::-webkit-scrollbar { width: 4px; }
+        .bookmarks-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
         .bookmark-item {
             display: flex; align-items: center; gap: 12px;
             padding: 10px 12px; border-radius: var(--radius-sm);
@@ -310,7 +335,7 @@
         .todo-count { font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono); }
         .todo-input-row { display: flex; gap: 8px; margin-bottom: 16px; }
         .todo-input-row input { flex: 1; }
-        .todo-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+        .todo-list { display: flex; flex-direction: column; gap: 6px; flex: 1; overflow-y: auto; min-height: 0; }
         .todo-list::-webkit-scrollbar { width: 4px; }
         .todo-list::-webkit-scrollbar-track { background: transparent; }
         .todo-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -336,12 +361,12 @@
         /* ── Notes card ── */
         .notes-card { grid-column: span 1; }
         .notes-textarea {
-            width: 100%; resize: vertical;
+            width: 100%; resize: none;
             background: var(--bg-input); border: 1px solid var(--border);
             border-radius: var(--radius-sm); padding: 12px;
             color: var(--text-primary); font-family: var(--font-main);
             font-size: 0.9rem; line-height: 1.6; outline: none;
-            transition: border-color 0.2s; min-height: 120px;
+            transition: border-color 0.2s; flex: 1; min-height: 0;
         }
         .notes-textarea:focus { border-color: var(--accent); }
         .notes-status { font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; transition: all 0.3s; }
@@ -464,10 +489,15 @@
         }
 
         @media (max-width: 1024px) {
-            .main-layout { flex-direction: column; }
+            html, body { height: auto; overflow: auto; }
+            .container { flex: unset; }
+            .main-layout { flex-direction: column; flex: unset; }
+            .grid { grid-template-rows: unset; grid-template-columns: repeat(2, 1fr); }
             .right-sidebar { width: 100%; flex-direction: row; }
             .right-sidebar .card { flex: 1; }
-            .grid { grid-template-columns: repeat(2, 1fr); }
+            .notes-textarea { min-height: 120px; flex: unset; }
+            .todo-list { flex: unset; max-height: 220px; }
+            .bookmarks-grid { flex: unset; max-height: 200px; }
         }
 
         @media (max-width: 640px) {
@@ -590,7 +620,7 @@
             <div class="card notes-card" data-card="notes">
                 <span class="card-drag-handle" title="Taşı">⠿</span>
                 <div class="card-header"><span class="card-title">Hızlı Notlar</span></div>
-                <textarea class="notes-textarea" id="notes-area" placeholder="Düşüncelerini buraya yaz..." style="height: 130px;"></textarea>
+                <textarea class="notes-textarea" id="notes-area" placeholder="Düşüncelerini buraya yaz..."></textarea>
                 <div class="notes-status" id="notes-status"></div>
             </div>
 
