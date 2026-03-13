@@ -520,11 +520,13 @@ def get_rates():
 
     # Forex: USD/TRY ve EUR/TRY
     try:
-        fx = open_url('https://api.frankfurter.app/latest?base=USD&symbols=TRY,EUR')
+        fx = open_url('https://api.frankfurter.app/latest?base=USD&symbols=TRY,EUR,GBP')
         usd_try = fx['rates']['TRY']
         usd_eur = fx['rates']['EUR']
+        usd_gbp = fx['rates']['GBP']
         result['USD/TRY'] = round(usd_try, 2)
         result['EUR/TRY'] = round(usd_try / usd_eur, 2)
+        result['GBP/TRY'] = round(usd_try / usd_gbp, 2)
         result['_usd_try'] = usd_try
     except Exception as e:
         print(f"Forex fetch failed: {e}", flush=True)
