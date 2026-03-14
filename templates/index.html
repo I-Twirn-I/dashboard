@@ -293,10 +293,26 @@
         .calendar-nav { background: none; color: var(--text-secondary); border: none; padding: 4px 8px; font-size: 1rem; cursor: pointer; border-radius: 6px; transition: all 0.2s; }
         .calendar-nav:hover { background: var(--bg-input); color: var(--text-primary); transform: none; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-        .calendar-day { text-align: center; font-size: 0.7rem; padding: 2px 2px; border-radius: 6px; color: var(--text-secondary); }
+        .calendar-day { text-align: center; font-size: 0.7rem; padding: 2px 2px; border-radius: 6px; color: var(--text-secondary); cursor: pointer; position: relative; }
+        .calendar-day:not(.empty):hover { background: var(--bg-input); color: var(--text-primary); }
         .calendar-day.today { background: var(--accent); color: white; font-weight: 600; }
-        .calendar-day.empty { color: transparent; }
+        .calendar-day.today:hover { background: var(--accent); }
+        .calendar-day.has-note::after { content: ''; position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+        .calendar-day.today.has-note::after { background: white; }
+        .calendar-day.empty { color: transparent; pointer-events: none; }
         .calendar-day-name { text-align: center; font-size: 0.65rem; font-weight: 600; color: var(--text-muted); padding: 4px 2px; }
+        .cal-note-panel { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 12px; display: none; flex-direction: column; gap: 8px; }
+        .cal-note-panel.open { display: flex; }
+        .cal-note-panel .cal-note-label { font-size: 0.75rem; font-weight: 600; color: var(--accent); }
+        .cal-note-panel textarea { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 0.8rem; resize: none; padding: 8px 10px; outline: none; font-family: var(--font-main); line-height: 1.5; }
+        .cal-note-panel textarea:focus { border-color: var(--accent); }
+        .cal-note-panel .cal-note-actions { display: flex; gap: 6px; justify-content: flex-end; }
+        .cal-note-panel .cal-note-actions button { font-size: 0.75rem; padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; font-family: var(--font-main); }
+        .cal-note-save { background: var(--accent); color: white; }
+        .cal-note-save:hover { opacity: 0.85; }
+        .cal-note-delete { background: var(--danger-soft); color: var(--danger); }
+        .cal-note-delete:hover { background: var(--danger); color: white; }
+        .cal-note-close { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border) !important; }
 
         /* ── Weather card ── */
         .weather-card { grid-column: span 1; }
@@ -644,6 +660,15 @@
                         <span class="calendar-month" id="calendar-month"></span>
                         <button class="calendar-nav" onclick="changeMonth(1)">›</button>
                     </div>
+                    <div class="cal-note-panel" id="cal-note-panel">
+                        <span class="cal-note-label" id="cal-note-label"></span>
+                        <textarea id="cal-note-input" rows="3" placeholder="Bu güne not ekle..."></textarea>
+                        <div class="cal-note-actions">
+                            <button class="cal-note-close" onclick="closeCalNote()">✕</button>
+                            <button class="cal-note-delete" id="cal-note-delete-btn" onclick="deleteCalNote()" style="display:none">Sil</button>
+                            <button class="cal-note-save" onclick="saveCalNote()">Kaydet</button>
+                        </div>
+                    </div>
                     <div class="calendar-grid" id="calendar-grid"></div>
                 </div>
             </div>
@@ -840,6 +865,7 @@
             document.getElementById('notes-area').value = appData.notes || '';
             document.getElementById('city-input').value = appData.city || 'Istanbul';
             fetchWeather(appData.city || 'Istanbul');
+            calendarNotes = appData.calendar_notes || {};
             renderCalendar();
             updatePomoUI();
             updatePomoStats();
@@ -1466,6 +1492,8 @@
 
         // ── Calendar ───────────────────────────────────────────────────────────
         let calendarDate = new Date();
+        let calendarNotes = {};
+        let selectedCalDate = null;
 
         function renderCalendar() {
             const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
@@ -1483,14 +1511,63 @@
             for (let i = 0; i < offset; i++) html += `<div class="calendar-day empty"></div>`;
             for (let d = 1; d <= daysInMonth; d++) {
                 const isToday = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-                html += `<div class="calendar-day ${isToday ? 'today' : ''}">${d}</div>`;
+                const dateKey = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const hasNote = !!calendarNotes[dateKey];
+                html += `<div class="calendar-day ${isToday ? 'today' : ''} ${hasNote ? 'has-note' : ''}" onclick="openCalNote('${dateKey}', ${d})">${d}</div>`;
             }
             document.getElementById('calendar-grid').innerHTML = html;
         }
 
         function changeMonth(dir) {
             calendarDate.setMonth(calendarDate.getMonth() + dir);
+            closeCalNote();
             renderCalendar();
+        }
+
+        function openCalNote(dateKey, day) {
+            selectedCalDate = dateKey;
+            const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+            const [y, m, d] = dateKey.split('-');
+            document.getElementById('cal-note-label').textContent = `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
+            document.getElementById('cal-note-input').value = calendarNotes[dateKey] || '';
+            const deleteBtn = document.getElementById('cal-note-delete-btn');
+            deleteBtn.style.display = calendarNotes[dateKey] ? 'inline-block' : 'none';
+            document.getElementById('cal-note-panel').classList.add('open');
+            document.getElementById('cal-note-input').focus();
+        }
+
+        function closeCalNote() {
+            document.getElementById('cal-note-panel').classList.remove('open');
+            selectedCalDate = null;
+        }
+
+        async function saveCalNote() {
+            if (!selectedCalDate) return;
+            const note = document.getElementById('cal-note-input').value.trim();
+            const res = await fetch('/api/calendar-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: selectedCalDate, note })
+            });
+            if (res.ok) {
+                calendarNotes = await res.json();
+                closeCalNote();
+                renderCalendar();
+            }
+        }
+
+        async function deleteCalNote() {
+            if (!selectedCalDate) return;
+            const res = await fetch('/api/calendar-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: selectedCalDate, note: '' })
+            });
+            if (res.ok) {
+                calendarNotes = await res.json();
+                closeCalNote();
+                renderCalendar();
+            }
         }
 
         // ── Rates ─────────────────────────────────────────────────────────────

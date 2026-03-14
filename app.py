@@ -100,6 +100,7 @@ DEFAULT_DATA = {
     "city": "Istanbul",
     "reminders": [],
     "habits": [],
+    "calendar_notes": {},
     "card_order": DEFAULT_CARD_ORDER,
 }
 
@@ -502,6 +503,28 @@ def check_habit(habit_id):
             break
     save_data(data)
     return jsonify(data['habits'])
+
+
+# ── Calendar Notes API ─────────────────────────────────────────────────────────
+
+@app.route('/api/calendar-notes', methods=['POST'])
+@login_required
+@rate_limit(60, 60)
+def save_calendar_note():
+    body = request.get_json(silent=True)
+    if not body or 'date' not in body:
+        return jsonify({'error': 'Tarih zorunludur.'}), 400
+    date_str = body['date'].strip()   # "YYYY-MM-DD"
+    note_text = body.get('note', '').strip()
+    data = load_data()
+    if 'calendar_notes' not in data:
+        data['calendar_notes'] = {}
+    if note_text:
+        data['calendar_notes'][date_str] = note_text
+    else:
+        data['calendar_notes'].pop(date_str, None)
+    save_data(data)
+    return jsonify(data['calendar_notes'])
 
 
 # ── Rates (Döviz / Kripto / Altın) ────────────────────────────────────────────
