@@ -1544,30 +1544,31 @@
         async function saveCalNote() {
             if (!selectedCalDate) return;
             const note = document.getElementById('cal-note-input').value.trim();
-            const res = await fetch('/api/calendar-notes', {
+            // Optimistic update
+            if (note) calendarNotes[selectedCalDate] = note;
+            else delete calendarNotes[selectedCalDate];
+            closeCalNote();
+            renderCalendar();
+            // Arka planda sunucuya gönder
+            fetch('/api/calendar-notes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ date: selectedCalDate, note })
-            });
-            if (res.ok) {
-                calendarNotes = await res.json();
-                closeCalNote();
-                renderCalendar();
-            }
+            }).then(r => r.ok && r.json()).then(data => { if (data) calendarNotes = data; });
         }
 
         async function deleteCalNote() {
             if (!selectedCalDate) return;
-            const res = await fetch('/api/calendar-notes', {
+            // Optimistic update
+            delete calendarNotes[selectedCalDate];
+            closeCalNote();
+            renderCalendar();
+            // Arka planda sunucuya gönder
+            fetch('/api/calendar-notes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ date: selectedCalDate, note: '' })
-            });
-            if (res.ok) {
-                calendarNotes = await res.json();
-                closeCalNote();
-                renderCalendar();
-            }
+            }).then(r => r.ok && r.json()).then(data => { if (data) calendarNotes = data; });
         }
 
         // ── Rates ─────────────────────────────────────────────────────────────
