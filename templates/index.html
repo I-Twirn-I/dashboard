@@ -357,8 +357,14 @@
 
         /* ── Pomodoro anim ── */
         .pomo-anim { height: 0; margin: 0; }
-        @keyframes pomoFlicker { 0%,100%{transform:scaleY(1)} 35%{transform:scaleY(1.1)} 65%{transform:scaleY(0.93)} }
+        .pomo-flame-overlay { position:absolute; bottom:5px; left:50%; transform:translateX(-50%); width:26px; height:36px; pointer-events:none; }
+        @keyframes pomoFlicker { 0%,100%{opacity:.65} 38%{opacity:1} 68%{opacity:.48} }
         @keyframes pomoSteam   { 0%{transform:translateY(0) scaleX(1);opacity:.85} 100%{transform:translateY(-22px) scaleX(1.5);opacity:0} }
+
+        /* ── EUR Chart ── */
+        .rates-chart { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+        .rates-chart-lbl { font-size:0.68rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:4px; }
+        @keyframes eurDraw { to { stroke-dashoffset: 0; } }
 
         /* ── Rates chart ── */
         .rates-chart { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:7px; }
@@ -790,10 +796,10 @@
                             </clipPath>
                         </defs>
                         <circle class="pomodoro-ring-bg" cx="40" cy="40" r="34"/>
-                        <g id="pomo-flame-group" clip-path="url(#pomoRingClip)"></g>
                         <circle class="pomodoro-ring-fill" id="pomo-ring" cx="40" cy="40" r="34"
                             stroke-dasharray="213.6" stroke-dashoffset="0"/>
                     </svg>
+                    <div id="pomo-flame-overlay" class="pomo-flame-overlay"></div>
                     <div class="pomodoro-time" id="pomo-time">25:00</div>
                 </div>
                 <div id="pomo-anim" class="pomo-anim"></div>
@@ -858,7 +864,7 @@
                 <div id="rates-list">
                     <div style="font-size:0.85rem;color:var(--text-muted);text-align:center;padding:16px;">Yükleniyor...</div>
                 </div>
-                <div id="rates-chart" class="rates-chart" style="display:none"></div>
+                <div id="rates-chart" class="rates-chart"><div style="font-size:.75rem;color:var(--text-muted);text-align:center;padding:8px 0">EUR/TRY yükleniyor...</div></div>
             </div>
 
         </div><!-- /right-sidebar -->
@@ -940,6 +946,8 @@
             setInterval(checkReminders, 30000);
             fetchRates();
             setInterval(fetchRates, 300000);
+            fetchEurChart();
+            setInterval(fetchEurChart, 3600000);
 
             document.getElementById('notes-area').addEventListener('input', () => {
                 const status = document.getElementById('notes-status');
@@ -1415,21 +1423,18 @@
         }
 
         function updatePomoAnim() {
-            const fg = document.getElementById('pomo-flame-group');
-            if (!fg) return;
-            if (!pomoRunning) { fg.innerHTML = ''; return; }
-            if (!pomoIsBreak) {
-                // Alev — ring içinde, saatin arkasında, çok hafif
-                fg.innerHTML = `
-                <g transform="translate(40,72)" style="transform-origin:0px 0px;animation:pomoFlicker 1.1s ease-in-out infinite">
-                    <path d="M0 0 C-11 0 -16-8 -13-17 C-11-23 -7-24 -9-30 C-5-24 -6-15 -2-17 C-3-22 0-26 0-30 C0-26 3-22 2-17 C6-15 5-24 9-30 C7-24 11-23 13-17 C16-8 11 0 0 0Z" fill="#f97316" opacity="0.28"/>
-                    <path d="M0 0 C-7 0 -9-5 -8-11 C-6-15 -4-16 -5-20 C-2-15 -3-9 0-11 C3-9 2-15 5-20 C6-16 8-15 8-11 C9-5 7 0 0 0Z" fill="#fbbf24" opacity="0.26"/>
-                    <path d="M0 0 C-3.5 0 -5-3 -4-7 C-3-9 -1.5-10 -2-13 C0-10 0-7 0-8 C0-7 0-10 2-13 C2.5-10 3-9 4-7 C5-3 3.5 0 0 0Z" fill="#fde68a" opacity="0.22"/>
-                </g>`;
-            } else {
-                // Mola — hafif yeşil nabız
-                fg.innerHTML = `<circle cx="40" cy="40" r="27" fill="#34d399" opacity="0.07" style="animation:wxSunPulse 2s ease-in-out infinite"/>`;
-            }
+            const el = document.getElementById('pomo-flame-overlay');
+            if (!el) return;
+            if (!pomoRunning || pomoIsBreak) { el.innerHTML = ''; return; }
+            el.innerHTML = `
+            <svg width="26" height="36" viewBox="0 0 26 36" xmlns="http://www.w3.org/2000/svg">
+                <path d="M13 36 C5 36 0 27 3 18 C5 11 10 9 8 2 C13 8 11 17 15 15 C13 7 16 3 13 0 C20 5 21 13 17 17 C21 14 20 8 25 3 C23 11 25 13 24 19 C25 27 21 36 13 36Z"
+                      fill="#f97316" style="animation:pomoFlicker .9s ease-in-out infinite"/>
+                <path d="M13 36 C7 36 4 29 6 22 C8 16 11 15 10 9 C13 14 12 21 15 19 C14 13 16 9 13 6 C18 10 18 17 15 20 C18 17 17 12 21 8 C20 15 21 17 21 22 C21 29 19 36 13 36Z"
+                      fill="#fbbf24" style="animation:pomoFlicker 1s ease-in-out .18s infinite"/>
+                <path d="M13 36 C9 36 7 31 9 25 C10 20 12 19 11 14 C13 18 13 23 15 22 C15 17 16 14 13 11 C16 15 16 21 14 23 C16 20 16 16 18 13 C17 19 18 21 18 25 C18 31 17 36 13 36Z"
+                      fill="#fde68a" style="animation:pomoFlicker 1.1s ease-in-out .36s infinite"/>
+            </svg>`;
         }
 
         function pomodoroTick() {
@@ -1506,8 +1511,8 @@
             pomoTotal = POMO_WORK;
             document.getElementById('pomo-start').textContent = '▶ Başlat';
             updatePomoUI();
-            const fg = document.getElementById('pomo-flame-group');
-            if (fg) fg.innerHTML = '';
+            const fo = document.getElementById('pomo-flame-overlay');
+            if (fo) fo.innerHTML = '';
         }
 
         // ── Reminders ─────────────────────────────────────────────────────────
@@ -1805,66 +1810,7 @@
         }
 
         let _prevRates = JSON.parse(localStorage.getItem('prevRates') || '{}');
-        let _rateHistory = JSON.parse(localStorage.getItem('rateHistory') || '{}');
-        const SPARKLINE_KEYS = ['USD/TRY', 'EUR/TRY', 'BTC/USD'];
-        const MAX_HISTORY = 24;
-
-        function pushRateHistory(data) {
-            const now = Date.now();
-            SPARKLINE_KEYS.forEach(k => {
-                if (data[k] === undefined) return;
-                if (!_rateHistory[k]) _rateHistory[k] = [];
-                _rateHistory[k].push({ t: now, v: data[k] });
-                if (_rateHistory[k].length > MAX_HISTORY) _rateHistory[k].shift();
-            });
-            localStorage.setItem('rateHistory', JSON.stringify(_rateHistory));
-        }
-
-        function renderSparklines() {
-            const el = document.getElementById('rates-chart');
-            if (!el) return;
-            const rows = SPARKLINE_KEYS.map(k => {
-                const hist = (_rateHistory[k] || []);
-                if (hist.length < 2) return null;
-                const vals = hist.map(p => p.v);
-                const min = Math.min(...vals), max = Math.max(...vals);
-                const range = max - min || min * 0.001 || 1;
-                const H = 26, pad = 3;
-                const pts = vals.map((v, i) => {
-                    const x = ((i / (vals.length - 1)) * 100).toFixed(1) + '%';
-                    const y = (pad + (H - pad*2) * (1 - (v - min) / range)).toFixed(1);
-                    return null; // use percent x below
-                });
-                const ptStr = vals.map((v, i) => {
-                    const xPct = (i / (vals.length - 1)) * 100;
-                    const y = (pad + (H - pad*2) * (1 - (v - min) / range)).toFixed(1);
-                    return `${xPct.toFixed(1)},${y}`;
-                }).join(' ');
-                const last = vals[vals.length - 1], prev2 = vals[vals.length - 2];
-                const trend = last > prev2 ? 'up' : last < prev2 ? 'down' : 'flat';
-                const color = trend === 'up' ? 'var(--success)' : trend === 'down' ? 'var(--danger)' : 'var(--text-muted)';
-                const lastX = 100, lastY = (pad + (H - pad*2) * (1 - (last - min) / range)).toFixed(1);
-                const meta = RATE_META[k];
-                return `
-                <div style="display:flex;align-items:center;gap:8px">
-                    <span style="font-size:0.68rem;color:var(--text-muted);white-space:nowrap;width:54px;flex-shrink:0">${meta.icon} ${k}</span>
-                    <svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" style="flex:1;height:${H}px">
-                        <defs>
-                            <linearGradient id="sg_${k.replace('/','_')}" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stop-color="${color}" stop-opacity="0.18"/>
-                                <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-                            </linearGradient>
-                        </defs>
-                        <polyline points="${ptStr}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
-                        <circle cx="${lastX}" cy="${lastY}" r="2" fill="${color}"/>
-                    </svg>
-                </div>`;
-            }).filter(Boolean);
-
-            if (rows.length === 0) { el.style.display = 'none'; return; }
-            el.style.display = 'flex';
-            el.innerHTML = `<div class="rates-chart-lbl">Geçmiş</div>` + rows.join('');
-        }
+        let _eurCache = null, _eurCacheTs = 0;
 
         async function fetchRates() {
             try {
@@ -1889,12 +1835,91 @@
                 }).join('');
                 _prevRates = { ...data };
                 localStorage.setItem('prevRates', JSON.stringify(_prevRates));
-                pushRateHistory(data);
-                renderSparklines();
                 const now = new Date();
                 const el = document.getElementById('rates-updated');
                 if (el) el.textContent = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} güncellendi`;
             } catch {}
+        }
+
+        // ── EUR/TRY Historical Chart ────────────────────────────────────────────
+        async function fetchEurChart() {
+            if (_eurCache && Date.now() - _eurCacheTs < 3600000) { renderEurChart(_eurCache); return; }
+            try {
+                const start = new Date(Date.now() - 35 * 864e5).toISOString().slice(0,10);
+                const res = await fetch(`https://api.frankfurter.app/${start}..?from=EUR&to=TRY`);
+                const data = await res.json();
+                const vals = Object.entries(data.rates || {})
+                    .sort((a,b) => a[0].localeCompare(b[0]))
+                    .map(([d,r]) => ({ d, v: r.TRY }));
+                if (vals.length < 2) return;
+                _eurCache = vals; _eurCacheTs = Date.now();
+                renderEurChart(vals);
+            } catch { /* API hata - grafik gösterme */ }
+        }
+
+        function renderEurChart(vals) {
+            const el = document.getElementById('rates-chart');
+            if (!el || !vals || vals.length < 2) return;
+            const W = 220, H = 68, px = 3, py = 5;
+            const vs = vals.map(v => v.v);
+            const min = Math.min(...vs), max = Math.max(...vs), range = max - min || 1;
+            const last = vs[vs.length-1], first = vs[0];
+            const pct = ((last - first) / first * 100).toFixed(1);
+            const up = last >= first;
+            const pctColor = up ? '#f87171' : '#34d399'; // EUR↑ = TRY zayıf = kötü
+
+            const pts = vals.map((v,i) => ({
+                x: px + (i / (vals.length-1)) * (W - px*2),
+                y: py + (1 - (v.v - min) / range) * (H - py*2)
+            }));
+
+            // Catmull-Rom smooth path
+            function smooth(p) {
+                let d = `M${p[0].x.toFixed(1)},${p[0].y.toFixed(1)}`;
+                for (let i=1; i<p.length; i++) {
+                    const p0=p[Math.max(0,i-2)], p1=p[i-1], p2=p[i], p3=p[Math.min(p.length-1,i+1)];
+                    const cp1x=p1.x+(p2.x-p0.x)/5, cp1y=p1.y+(p2.y-p0.y)/5;
+                    const cp2x=p2.x-(p3.x-p1.x)/5, cp2y=p2.y-(p3.y-p1.y)/5;
+                    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+                }
+                return d;
+            }
+            const line = smooth(pts);
+            const lp = pts[pts.length-1];
+            const fill = `${line} L${lp.x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`;
+            const pathLen = Math.round(W * 2.2);
+            const minY = pts.reduce((a,b)=>a.y>b.y?a:b); // highest y = lowest val
+            const maxY = pts.reduce((a,b)=>a.y<b.y?a:b); // lowest y = highest val
+
+            el.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+                <span style="font-size:.72rem;font-weight:600;color:var(--accent);letter-spacing:.8px">💶 EUR / TRY</span>
+                <span style="font-family:var(--font-mono);font-size:.82rem;color:var(--text-primary);font-weight:500">
+                    ${last.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+                    <span style="font-size:.65rem;color:${pctColor};margin-left:2px">${up?'+':''}${pct}%</span>
+                </span>
+            </div>
+            <svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;overflow:visible">
+                <defs>
+                    <linearGradient id="eurFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#6c63ff" stop-opacity=".4"/>
+                        <stop offset="100%" stop-color="#6c63ff" stop-opacity="0"/>
+                    </linearGradient>
+                    <filter id="eurGlow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                </defs>
+                <path d="${fill}" fill="url(#eurFill)"/>
+                <path d="${line}" fill="none" stroke="#6c63ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                      filter="url(#eurGlow)"
+                      style="stroke-dasharray:${pathLen};stroke-dashoffset:${pathLen};animation:eurDraw 1.8s cubic-bezier(.4,0,.2,1) forwards"/>
+                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="3.5" fill="#6c63ff" style="animation:wxSunPulse 2s ease-in-out infinite"/>
+                <text x="${maxY.x.toFixed(1)}" y="${(maxY.y-4).toFixed(1)}" font-size="7.5" fill="#a78bfa" text-anchor="middle" opacity=".75">${max.toLocaleString('tr-TR',{minimumFractionDigits:1,maximumFractionDigits:1})}</text>
+                <text x="${minY.x.toFixed(1)}" y="${(minY.y+10).toFixed(1)}" font-size="7.5" fill="#7c3aed" text-anchor="middle" opacity=".65">${min.toLocaleString('tr-TR',{minimumFractionDigits:1,maximumFractionDigits:1})}</text>
+            </svg>
+            <div style="display:flex;justify-content:space-between;margin-top:3px">
+                <span style="font-size:.6rem;color:var(--text-muted)">${vals[0].d.slice(5)}</span>
+                <span style="font-size:.6rem;color:var(--text-muted)">${vals.length} gün</span>
+                <span style="font-size:.6rem;color:var(--text-muted)">${vals[vals.length-1].d.slice(5)}</span>
+            </div>`;
         }
 
         // ── Utils ──────────────────────────────────────────────────────────────
