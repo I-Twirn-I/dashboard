@@ -176,6 +176,7 @@ def load_user(user_id):
 # ── Per-user data helpers ──────────────────────────────────────────────────────
 
 def load_data():
+    from datetime import date
     with Db() as db:
         row = db.execute('SELECT data FROM users WHERE id = ?', (current_user.id,)).fetchone()
     if row and row['data']:
@@ -185,6 +186,14 @@ def load_data():
             merged.update(stored)
             if 'card_order' not in merged:
                 merged['card_order'] = DEFAULT_CARD_ORDER[:]
+            # Geçmiş aylara ait takvim notlarını temizle
+            if merged.get('calendar_notes'):
+                today = date.today()
+                current_month = (today.year, today.month)
+                merged['calendar_notes'] = {
+                    k: v for k, v in merged['calendar_notes'].items()
+                    if (lambda p: (int(p[0]), int(p[1])) >= current_month)(k.split('-'))
+                }
             return merged
         except Exception:
             pass
