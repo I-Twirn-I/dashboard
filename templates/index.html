@@ -357,14 +357,15 @@
 
         /* ── Pomodoro anim ── */
         .pomo-anim { height: 0; margin: 0; }
-        @keyframes ringGlow      { 0%,100%{filter:drop-shadow(0 0 4px rgba(108,99,255,.5));stroke-width:6}  50%{filter:drop-shadow(0 0 14px rgba(108,99,255,1));stroke-width:8} }
-        @keyframes ringGlowBreak { 0%,100%{filter:drop-shadow(0 0 4px rgba(52,211,153,.5));stroke-width:6}  50%{filter:drop-shadow(0 0 14px rgba(52,211,153,1));stroke-width:8} }
-        @keyframes ringSpinDash  { to { stroke-dashoffset: -213.6; } }
-        .pomodoro-ring-fill.running       { animation: ringGlow      2s ease-in-out infinite; }
-        .pomodoro-ring-fill.running.break { animation: ringGlowBreak 2s ease-in-out infinite; }
-        .pomodoro-ring-spin { fill:none; stroke:rgba(108,99,255,.55); stroke-width:2.5; stroke-linecap:round; stroke-dasharray:48 166; transform:rotate(-90deg); transform-origin:center; opacity:0; transition:opacity .4s; }
-        .pomodoro-ring-spin.running { opacity:1; animation:ringSpinDash 1.6s linear infinite; }
-        .pomodoro-ring-spin.running.break { stroke:rgba(52,211,153,.55); }
+        @keyframes ringGlowPulse      { 0%,100%{opacity:.18;stroke-width:12} 50%{opacity:.45;stroke-width:20} }
+        @keyframes ringGlowPulseBreak { 0%,100%{opacity:.18;stroke-width:12} 50%{opacity:.45;stroke-width:20} }
+        @keyframes ringSpinDash       { to { stroke-dashoffset: -213.6; } }
+        .pomodoro-ring-glow { fill:none; stroke:var(--accent); stroke-width:14; transform:rotate(-90deg); transform-origin:center; opacity:0; transition:opacity .4s; }
+        .pomodoro-ring-glow.running       { opacity:1; animation:ringGlowPulse      2s ease-in-out infinite; }
+        .pomodoro-ring-glow.running.break { stroke:var(--success); animation:ringGlowPulseBreak 2s ease-in-out infinite; }
+        .pomodoro-ring-spin { fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linecap:round; stroke-dasharray:48 166; transform:rotate(-90deg); transform-origin:center; opacity:0; transition:opacity .4s; }
+        .pomodoro-ring-spin.running       { opacity:.7; animation:ringSpinDash 1.6s linear infinite; }
+        .pomodoro-ring-spin.running.break { stroke:var(--success); }
 
         /* ── EUR Chart ── */
         .rates-chart { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
@@ -801,6 +802,7 @@
                             </clipPath>
                         </defs>
                         <circle class="pomodoro-ring-bg" cx="40" cy="40" r="34"/>
+                        <circle class="pomodoro-ring-glow" id="pomo-ring-glow" cx="40" cy="40" r="34"/>
                         <circle class="pomodoro-ring-fill" id="pomo-ring" cx="40" cy="40" r="34"
                             stroke-dasharray="213.6" stroke-dashoffset="0"/>
                         <circle class="pomodoro-ring-spin" id="pomo-ring-spin" cx="40" cy="40" r="34"/>
@@ -1428,17 +1430,20 @@
         }
 
         function updatePomoAnim() {
-            const ring = document.getElementById('pomo-ring');
+            const glow = document.getElementById('pomo-ring-glow');
             const spin = document.getElementById('pomo-ring-spin');
-            if (!ring || !spin) return;
+            if (!glow || !spin) return;
             if (pomoRunning) {
-                ring.classList.add('running');
+                glow.classList.add('running');
                 spin.classList.add('running');
-                if (pomoIsBreak) { spin.classList.add('break'); } else { spin.classList.remove('break'); }
+                if (pomoIsBreak) {
+                    glow.classList.add('break'); spin.classList.add('break');
+                } else {
+                    glow.classList.remove('break'); spin.classList.remove('break');
+                }
             } else {
-                ring.classList.remove('running');
-                spin.classList.remove('running');
-                spin.classList.remove('break');
+                glow.classList.remove('running', 'break');
+                spin.classList.remove('running', 'break');
             }
         }
 
