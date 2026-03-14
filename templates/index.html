@@ -357,9 +357,14 @@
 
         /* ── Pomodoro anim ── */
         .pomo-anim { height: 0; margin: 0; }
-        .pomo-flame-overlay { position:absolute; bottom:5px; left:50%; transform:translateX(-50%); width:26px; height:36px; pointer-events:none; }
-        @keyframes pomoFlicker { 0%,100%{opacity:.65} 38%{opacity:1} 68%{opacity:.48} }
-        @keyframes pomoSteam   { 0%{transform:translateY(0) scaleX(1);opacity:.85} 100%{transform:translateY(-22px) scaleX(1.5);opacity:0} }
+        @keyframes ringGlow      { 0%,100%{filter:drop-shadow(0 0 4px rgba(108,99,255,.5));stroke-width:6}  50%{filter:drop-shadow(0 0 14px rgba(108,99,255,1));stroke-width:8} }
+        @keyframes ringGlowBreak { 0%,100%{filter:drop-shadow(0 0 4px rgba(52,211,153,.5));stroke-width:6}  50%{filter:drop-shadow(0 0 14px rgba(52,211,153,1));stroke-width:8} }
+        @keyframes ringSpinDash  { to { stroke-dashoffset: -213.6; } }
+        .pomodoro-ring-fill.running       { animation: ringGlow      2s ease-in-out infinite; }
+        .pomodoro-ring-fill.running.break { animation: ringGlowBreak 2s ease-in-out infinite; }
+        .pomodoro-ring-spin { fill:none; stroke:rgba(108,99,255,.55); stroke-width:2.5; stroke-linecap:round; stroke-dasharray:48 166; transform:rotate(-90deg); transform-origin:center; opacity:0; transition:opacity .4s; }
+        .pomodoro-ring-spin.running { opacity:1; animation:ringSpinDash 1.6s linear infinite; }
+        .pomodoro-ring-spin.running.break { stroke:rgba(52,211,153,.55); }
 
         /* ── EUR Chart ── */
         .rates-chart { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
@@ -798,8 +803,8 @@
                         <circle class="pomodoro-ring-bg" cx="40" cy="40" r="34"/>
                         <circle class="pomodoro-ring-fill" id="pomo-ring" cx="40" cy="40" r="34"
                             stroke-dasharray="213.6" stroke-dashoffset="0"/>
+                        <circle class="pomodoro-ring-spin" id="pomo-ring-spin" cx="40" cy="40" r="34"/>
                     </svg>
-                    <div id="pomo-flame-overlay" class="pomo-flame-overlay"></div>
                     <div class="pomodoro-time" id="pomo-time">25:00</div>
                 </div>
                 <div id="pomo-anim" class="pomo-anim"></div>
@@ -1423,18 +1428,18 @@
         }
 
         function updatePomoAnim() {
-            const el = document.getElementById('pomo-flame-overlay');
-            if (!el) return;
-            if (!pomoRunning || pomoIsBreak) { el.innerHTML = ''; return; }
-            el.innerHTML = `
-            <svg width="26" height="36" viewBox="0 0 26 36" xmlns="http://www.w3.org/2000/svg">
-                <path d="M13 36 C5 36 0 27 3 18 C5 11 10 9 8 2 C13 8 11 17 15 15 C13 7 16 3 13 0 C20 5 21 13 17 17 C21 14 20 8 25 3 C23 11 25 13 24 19 C25 27 21 36 13 36Z"
-                      fill="#f97316" style="animation:pomoFlicker .9s ease-in-out infinite"/>
-                <path d="M13 36 C7 36 4 29 6 22 C8 16 11 15 10 9 C13 14 12 21 15 19 C14 13 16 9 13 6 C18 10 18 17 15 20 C18 17 17 12 21 8 C20 15 21 17 21 22 C21 29 19 36 13 36Z"
-                      fill="#fbbf24" style="animation:pomoFlicker 1s ease-in-out .18s infinite"/>
-                <path d="M13 36 C9 36 7 31 9 25 C10 20 12 19 11 14 C13 18 13 23 15 22 C15 17 16 14 13 11 C16 15 16 21 14 23 C16 20 16 16 18 13 C17 19 18 21 18 25 C18 31 17 36 13 36Z"
-                      fill="#fde68a" style="animation:pomoFlicker 1.1s ease-in-out .36s infinite"/>
-            </svg>`;
+            const ring = document.getElementById('pomo-ring');
+            const spin = document.getElementById('pomo-ring-spin');
+            if (!ring || !spin) return;
+            if (pomoRunning) {
+                ring.classList.add('running');
+                spin.classList.add('running');
+                if (pomoIsBreak) { spin.classList.add('break'); } else { spin.classList.remove('break'); }
+            } else {
+                ring.classList.remove('running');
+                spin.classList.remove('running');
+                spin.classList.remove('break');
+            }
         }
 
         function pomodoroTick() {
@@ -1511,8 +1516,7 @@
             pomoTotal = POMO_WORK;
             document.getElementById('pomo-start').textContent = '▶ Başlat';
             updatePomoUI();
-            const fo = document.getElementById('pomo-flame-overlay');
-            if (fo) fo.innerHTML = '';
+            updatePomoAnim();
         }
 
         // ── Reminders ─────────────────────────────────────────────────────────
