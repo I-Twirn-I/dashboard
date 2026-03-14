@@ -427,15 +427,21 @@
             display: flex; align-items: center; gap: 12px;
             padding: 10px 12px; border-radius: var(--radius-sm);
             background: var(--bg-input); cursor: pointer;
-            transition: all 0.2s; border: 1px solid transparent;
+            transition: border-color 0.2s, background 0.2s; border: 1px solid transparent;
         }
         .todo-item:hover { border-color: var(--border-hover); }
         .todo-item.done .todo-text { text-decoration: line-through; color: var(--text-muted); }
         .todo-checkbox {
             width: 18px; height: 18px; border: 2px solid var(--border);
-            border-radius: 5px; flex-shrink: 0; transition: all 0.2s;
+            border-radius: 5px; flex-shrink: 0; transition: background .2s, border-color .2s;
         }
         .todo-item.done .todo-checkbox { background: var(--success); border-color: var(--success); }
+        @keyframes todoCheck   { 0%{transform:scale(1) translateX(0)} 40%{transform:scale(1.04) translateX(6px)} 70%{transform:scale(.97)} 100%{transform:scale(1) translateX(0)} }
+        @keyframes todoUncheck { 0%{transform:scale(1) translateX(0)} 40%{transform:scale(1.02) translateX(-5px)} 100%{transform:scale(1) translateX(0)} }
+        @keyframes todoCbPop   { 0%{transform:scale(1)} 45%{transform:scale(1.45)} 75%{transform:scale(.9)} 100%{transform:scale(1)} }
+        .todo-item.anim-check   { animation: todoCheck   .3s cubic-bezier(.34,1.4,.64,1) forwards; }
+        .todo-item.anim-uncheck { animation: todoUncheck .25s ease-out forwards; }
+        .todo-item.anim-check   .todo-checkbox { animation: todoCbPop .3s cubic-bezier(.34,1.4,.64,1) forwards; }
         .todo-text { font-size: 0.9rem; flex: 1; }
         .todo-delete { background: none; color: var(--text-muted); border: none; padding: 4px; font-size: 0.8rem; border-radius: 4px; opacity: 0; transition: all 0.2s; }
         .todo-item:hover .todo-delete { opacity: 1; }
@@ -1261,7 +1267,7 @@
                     </svg>
                 </div>` : '';
                 list.innerHTML = celebrateHTML + todos.map(t => `
-                    <div class="todo-item ${t.done ? 'done' : ''}" onclick="toggleTodo(${t.id})">
+                    <div class="todo-item ${t.done ? 'done' : ''}" data-id="${t.id}" onclick="toggleTodo(${t.id})">
                         <div class="todo-checkbox"></div>
                         <span class="todo-text">${escapeHtml(t.text)}</span>
                         <button class="todo-delete" onclick="event.stopPropagation();deleteTodo(${t.id})">✕</button>
@@ -1294,8 +1300,18 @@
 
         function toggleTodo(id) {
             const t = (appData.todos || []).find(t => t.id === id);
-            if (t) t.done = !t.done;
-            renderTodos();
+            if (!t) return;
+            t.done = !t.done;
+            const el = document.querySelector(`.todo-item[data-id="${id}"]`);
+            if (el) {
+                el.classList.add(t.done ? 'anim-check' : 'anim-uncheck');
+                // Optimistik: checkbox rengini hemen güncelle
+                const cb = el.querySelector('.todo-checkbox');
+                if (cb) { cb.style.background = t.done ? 'var(--success)' : ''; cb.style.borderColor = t.done ? 'var(--success)' : ''; }
+                setTimeout(() => renderTodos(), 300);
+            } else {
+                renderTodos();
+            }
             bgSave(`/api/todos/${id}/toggle`);
         }
 
