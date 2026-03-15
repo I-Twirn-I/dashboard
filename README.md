@@ -10,7 +10,7 @@ Kişisel kullanım için geliştirilmiş, tek sayfadan oluşan bir **fullstack d
 
 | Özellik | Açıklama |
 |---|---|
-| 🕐 **Saat & Takvim** | Gerçek zamanlı saat, aylık takvim ve 2 farklı şehrin saatini aynı anda görme (büyük/küçük format) |
+| 🕐 **Saat & Takvim** | Gerçek zamanlı saat, aylık takvim, takvimde ki günlere not ekleme ve 2 farklı şehrin saatini aynı anda görme (büyük/küçük format) |
 | 🌤️ **Hava Durumu** | İstediğin şehri yazarak güncel hava durumu bilgisi alma |
 | 🔗 **Kısayollar** | Sık kullanılan sitelere hızlı erişim linkleri |
 | 🔔 **Hatırlatıcılar** | Zamanlı ve tekrarlayan hatırlatıcı oluşturma |
