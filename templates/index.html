@@ -1205,19 +1205,38 @@
             }
         }
 
+        const WMO_MAP = {
+            0:  ['Açık',           '☀️',  'sunny'],
+            1:  ['Az bulutlu',     '🌤️', 'cloudy'], 2: ['Parçalı bulutlu','⛅','cloudy'], 3: ['Kapalı','☁️','cloudy'],
+            45: ['Sisli',          '🌫️', 'cloudy'], 48: ['Sisli','🌫️','cloudy'],
+            51: ['Çisenti',        '🌦️', 'rainy'],  53: ['Çisenti','🌦️','rainy'], 55: ['Çisenti','🌦️','rainy'],
+            61: ['Yağmurlu',       '🌧️', 'rainy'],  63: ['Yağmurlu','🌧️','rainy'], 65: ['Yağmurlu','🌧️','rainy'],
+            71: ['Karlı',          '🌨️', 'snowy'],  73: ['Karlı','🌨️','snowy'], 75: ['Karlı','🌨️','snowy'],
+            80: ['Sağanak',        '🌧️', 'rainy'],  81: ['Sağanak','🌧️','rainy'], 82: ['Sağanak','🌧️','rainy'],
+            95: ['Fırtınalı',      '⛈️', 'stormy'], 96: ['Dolu','⛈️','stormy'], 99: ['Dolu','⛈️','stormy'],
+        };
+
         async function fetchWeather(city) {
             try {
-                const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
-                if (res.status === 429) { showToast('Hava durumu için çok fazla istek.', 'error'); return; }
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                document.getElementById('weather-icon').textContent = data.icon;
-                document.getElementById('weather-temp').textContent = `${data.temp}°C`;
-                document.getElementById('weather-desc').textContent = data.stale ? `${data.desc} (önbellek)` : data.desc;
-                document.getElementById('weather-humidity').textContent = `${data.humidity}%`;
-                document.getElementById('weather-wind').textContent = `${data.wind} km/h`;
-                document.getElementById('weather-feels').textContent = `${data.feels_like}°C`;
-                renderWeatherAnim(data.anim_type || 'cloudy');
+                // Geocode
+                const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=tr&format=json`);
+                const geoData = await geoRes.json();
+                if (!geoData.results || !geoData.results.length) throw new Error('Şehir bulunamadı');
+                const { latitude, longitude, name } = geoData.results[0];
+
+                // Weather
+                const wxRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&wind_speed_unit=kmh`);
+                const wxData = await wxRes.json();
+                const cur = wxData.current;
+                const [desc, icon, animType] = WMO_MAP[cur.weather_code] || ['Parçalı bulutlu', '⛅', 'cloudy'];
+
+                document.getElementById('weather-icon').textContent = icon;
+                document.getElementById('weather-temp').textContent = `${Math.round(cur.temperature_2m)}°C`;
+                document.getElementById('weather-desc').textContent = `${name} — ${desc}`;
+                document.getElementById('weather-humidity').textContent = `${cur.relative_humidity_2m}%`;
+                document.getElementById('weather-wind').textContent = `${Math.round(cur.wind_speed_10m)} km/h`;
+                document.getElementById('weather-feels').textContent = `${Math.round(cur.apparent_temperature)}°C`;
+                renderWeatherAnim(animType);
             } catch {
                 document.getElementById('weather-desc').textContent = 'Hava bilgisi alınamadı';
                 document.getElementById('weather-icon').textContent = '❌';
