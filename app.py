@@ -108,6 +108,15 @@ DEFAULT_DATA = {
 # ── Rate limiting ──────────────────────────────────────────────────────────────
 
 _rate_store = defaultdict(list)
+_rate_store_last_cleanup = [time.time()]
+
+def _cleanup_rate_store():
+    now = time.time()
+    if now - _rate_store_last_cleanup[0] > 300:
+        expired = [ip for ip, times in _rate_store.items() if not times or now - times[-1] > 120]
+        for ip in expired:
+            del _rate_store[ip]
+        _rate_store_last_cleanup[0] = now
 
 def rate_limit(max_requests=30, window=60):
     def decorator(f):
@@ -115,6 +124,7 @@ def rate_limit(max_requests=30, window=60):
         def wrapper(*args, **kwargs):
             ip = request.remote_addr
             now = time.time()
+            _cleanup_rate_store()
             _rate_store[ip] = [t for t in _rate_store[ip] if now - t < window]
             if len(_rate_store[ip]) >= max_requests:
                 return jsonify({'error': 'Çok fazla istek. Lütfen bekleyin.'}), 429
