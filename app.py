@@ -732,8 +732,8 @@ def get_weather():
     if city in weather_cache and now - weather_cache[city]['time'] < 600:
         return jsonify(weather_cache[city]['data'])
 
-    # Try wttr.in first, then Open-Meteo as fallback
-    for fetcher in (fetch_weather_data, fetch_weather_openmeteo):
+    # Try Open-Meteo first (more reliable), then wttr.in as fallback
+    for fetcher in (fetch_weather_openmeteo, fetch_weather_data):
         try:
             result = fetcher(city)
             weather_cache[city] = {'data': result, 'time': now}
