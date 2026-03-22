@@ -75,7 +75,7 @@ class Db:
 
 SPOTIFY_CLIENT_ID     = os.environ.get('SPOTIFY_CLIENT_ID', '')
 SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET', '')
-SPOTIFY_REDIRECT_URI  = os.environ.get('SPOTIFY_REDIRECT_URI', 'https://dashboard-8rk5.onrender.com/callback')
+SPOTIFY_REDIRECT_URI  = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://localhost:5000/callback')
 SPOTIFY_SCOPES        = 'user-read-currently-playing user-read-playback-state'
 
 app = Flask(__name__)
