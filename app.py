@@ -4,7 +4,6 @@ import sqlite3
 import urllib.request
 import urllib.parse
 import urllib.error
-import ssl
 import base64
 import time
 from collections import defaultdict
@@ -138,30 +137,18 @@ def rate_limit(max_requests=30, window=60):
 
 def init_db():
     with Db() as db:
-        if USE_PG:
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id                    SERIAL PRIMARY KEY,
-                    username              TEXT UNIQUE NOT NULL,
-                    email                 TEXT UNIQUE NOT NULL,
-                    password_hash         TEXT NOT NULL,
-                    data                  TEXT NOT NULL DEFAULT '{}',
-                    spotify_access_token  TEXT DEFAULT '',
-                    spotify_refresh_token TEXT DEFAULT ''
-                )
-            ''')
-        else:
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username              TEXT UNIQUE NOT NULL,
-                    email                 TEXT UNIQUE NOT NULL,
-                    password_hash         TEXT NOT NULL,
-                    data                  TEXT NOT NULL DEFAULT '{}',
-                    spotify_access_token  TEXT DEFAULT '',
-                    spotify_refresh_token TEXT DEFAULT ''
-                )
-            ''')
+        pk = 'SERIAL PRIMARY KEY' if USE_PG else 'INTEGER PRIMARY KEY AUTOINCREMENT'
+        db.execute(f'''
+            CREATE TABLE IF NOT EXISTS users (
+                id                    {pk},
+                username              TEXT UNIQUE NOT NULL,
+                email                 TEXT UNIQUE NOT NULL,
+                password_hash         TEXT NOT NULL,
+                data                  TEXT NOT NULL DEFAULT '{{}}',
+                spotify_access_token  TEXT DEFAULT '',
+                spotify_refresh_token TEXT DEFAULT ''
+            )
+        ''')
         db.commit()
 
 
@@ -202,7 +189,7 @@ def load_data():
                 current_month = (today.year, today.month)
                 merged['calendar_notes'] = {
                     k: v for k, v in merged['calendar_notes'].items()
-                    if (lambda p: (int(p[0]), int(p[1])) >= current_month)(k.split('-'))
+                    if tuple(int(x) for x in k.split('-')[:2]) >= current_month
                 }
             return merged
         except Exception:
@@ -647,11 +634,8 @@ WTTR_SNOW = {179, 182, 185, 227, 230, 323, 326, 329, 332, 335, 338, 350, 362, 36
 
 
 def open_url(url):
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req, timeout=15, context=ctx) as res:
+    with urllib.request.urlopen(req, timeout=15) as res:
         return json.loads(res.read().decode())
 
 

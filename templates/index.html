@@ -1255,6 +1255,7 @@
         function applyTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
+            localStorage.setItem('dashboard_theme', theme);
         }
 
         async function toggleTheme() {
