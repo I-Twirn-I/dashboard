@@ -146,10 +146,25 @@ def init_db():
                 password_hash         TEXT NOT NULL,
                 data                  TEXT NOT NULL DEFAULT '{{}}',
                 spotify_access_token  TEXT DEFAULT '',
-                spotify_refresh_token TEXT DEFAULT ''
+                spotify_refresh_token TEXT DEFAULT '',
+                security_question     TEXT DEFAULT '',
+                security_answer_hash  TEXT DEFAULT ''
             )
         ''')
         db.commit()
+        # Mevcut veritabanına sütun ekle (migration)
+        for col, typedef in [
+            ('security_question',    "TEXT DEFAULT ''"),
+            ('security_answer_hash', "TEXT DEFAULT ''"),
+        ]:
+            try:
+                if USE_PG:
+                    db.execute(f'ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {typedef}')
+                else:
+                    db.execute(f'ALTER TABLE users ADD COLUMN {col} {typedef}')
+                db.commit()
+            except Exception:
+                pass
 
 
 # ── Flask-Login ────────────────────────────────────────────────────────────────
@@ -287,17 +302,22 @@ def register():
         username = request.form.get('username', '').strip()
         email    = request.form.get('email', '').strip()
         password = request.form.get('password', '')
+        sec_q    = request.form.get('security_question', '').strip()
+        sec_a    = request.form.get('security_answer', '').strip().lower()
         if len(username) < 3:
             error = 'Kullanıcı adı en az 3 karakter olmalı.'
         elif len(password) < 6:
             error = 'Şifre en az 6 karakter olmalı.'
+        elif not sec_q or not sec_a:
+            error = 'Güvenlik sorusu ve cevabı zorunludur.'
         else:
             try:
                 with Db() as db:
                     db.execute(
-                        'INSERT INTO users (username, email, password_hash, data) VALUES (?, ?, ?, ?)',
+                        'INSERT INTO users (username, email, password_hash, data, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)',
                         (username, email, generate_password_hash(password),
-                         json.dumps(DEFAULT_DATA, ensure_ascii=False))
+                         json.dumps(DEFAULT_DATA, ensure_ascii=False),
+                         sec_q, generate_password_hash(sec_a))
                     )
                     db.commit()
                 return redirect(url_for('login') + '?registered=1')
@@ -311,6 +331,59 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    error = None
+    success = None
+    question = None
+    username = None
+
+    if request.method == 'POST':
+        step = request.form.get('step', '1')
+        username = request.form.get('username', '').strip()
+
+        if step == '1':
+            with Db() as db:
+                row = db.execute('SELECT security_question FROM users WHERE username = ?', (username,)).fetchone()
+            if not row:
+                error = 'Kullanıcı bulunamadı.'
+                username = None
+            elif not row['security_question']:
+                error = 'Bu hesap için güvenlik sorusu tanımlanmamış.'
+                username = None
+            else:
+                question = row['security_question']
+
+        elif step == '2':
+            answer   = request.form.get('answer', '').strip().lower()
+            new_pw   = request.form.get('new_password', '')
+            confirm  = request.form.get('confirm_password', '')
+            with Db() as db:
+                row = db.execute('SELECT security_question, security_answer_hash FROM users WHERE username = ?', (username,)).fetchone()
+            if not row:
+                error = 'Kullanıcı bulunamadı.'
+            elif len(new_pw) < 6:
+                error = 'Yeni şifre en az 6 karakter olmalı.'
+                question = row['security_question']
+            elif new_pw != confirm:
+                error = 'Şifreler eşleşmiyor.'
+                question = row['security_question']
+            elif not row['security_answer_hash'] or not check_password_hash(row['security_answer_hash'], answer):
+                error = 'Güvenlik sorusu cevabı yanlış.'
+                question = row['security_question']
+            else:
+                with Db() as db:
+                    db.execute('UPDATE users SET password_hash = ? WHERE username = ?',
+                               (generate_password_hash(new_pw), username))
+                    db.commit()
+                success = 'Şifre başarıyla sıfırlandı.'
+                username = None
+
+    return render_template('forgot_password.html', question=question, username=username, error=error, success=success)
 
 
 @app.route('/change-password', methods=['GET', 'POST'])
