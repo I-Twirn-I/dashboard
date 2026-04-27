@@ -447,6 +447,20 @@
         .todo-item:hover .todo-delete { opacity: 1; }
         .todo-delete:hover { background: var(--danger-soft); color: var(--danger); transform: none; }
         .todo-empty { font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 16px; }
+        .todo-item.priority-high   { border-left: 3px solid #f87171; }
+        .todo-item.priority-medium { border-left: 3px solid #fbbf24; }
+        .todo-item.priority-low    { border-left: 3px solid #34d399; }
+        .todo-priority-btn {
+            width: 34px; height: 34px; padding: 0; flex-shrink: 0;
+            background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 8px; font-size: 1rem; line-height: 1;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s; color: var(--text-muted);
+        }
+        .todo-priority-btn:hover { border-color: var(--border-hover); transform: none; opacity: 1; }
+        .todo-priority-btn.p-high   { color: #f87171; border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.08); }
+        .todo-priority-btn.p-medium { color: #fbbf24; border-color: rgba(251,191,36,0.35);  background: rgba(251,191,36,0.08); }
+        .todo-priority-btn.p-low    { color: #34d399; border-color: rgba(52,211,153,0.35);  background: rgba(52,211,153,0.08); }
 
         /* ── Notes card ── */
         .notes-card { grid-column: span 1; }
@@ -634,6 +648,7 @@
             </div>
             <div class="header-actions">
                 <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Tema değiştir">🌙</button>
+                <a href="/change-password" class="btn-header">Şifre</a>
                 <a href="/logout" class="btn-header">Çıkış</a>
             </div>
         </div>
@@ -782,6 +797,7 @@
                     <span class="todo-count" id="todo-count"></span>
                 </div>
                 <div class="todo-input-row">
+                    <button class="todo-priority-btn p-medium" id="todo-priority-btn" onclick="cyclePriority()" title="Öncelik değiştir">●</button>
                     <input type="text" id="todo-input" placeholder="Yeni görev ekle..." onkeydown="if(event.key==='Enter')addTodo()" />
                     <button onclick="addTodo()">Ekle</button>
                 </div>
@@ -1266,6 +1282,16 @@
         }
 
         // ── Todos ──────────────────────────────────────────────────────────────
+        let currentPriority = 'medium';
+        const PRIORITY_ORDER = { high: 3, medium: 2, low: 1 };
+
+        function cyclePriority() {
+            const order = ['medium', 'high', 'low'];
+            currentPriority = order[(order.indexOf(currentPriority) + 1) % order.length];
+            const btn = document.getElementById('todo-priority-btn');
+            btn.className = `todo-priority-btn p-${currentPriority}`;
+        }
+
         function renderTodos() {
             const list = document.getElementById('todo-list');
             const todos = appData.todos || [];
@@ -1275,6 +1301,10 @@
             if (todos.length === 0) {
                 list.innerHTML = '<div class="todo-empty">Yapılacak bir şey yok — ya da henüz eklemedin 😉</div>';
             } else {
+                const sorted = [...todos].sort((a, b) => {
+                    if (a.done !== b.done) return a.done ? 1 : -1;
+                    return (PRIORITY_ORDER[b.priority || 'medium'] || 2) - (PRIORITY_ORDER[a.priority || 'medium'] || 2);
+                });
                 const colors = ['#6c63ff','#34d399','#fbbf24','#f87171','#a78bfa','#60a5fa','#fb923c','#34d399','#e879f9','#38bdf8'];
                 const celebrateHTML = allDone ? `<div class="todo-celebrate">
                     <svg width="100%" height="38" viewBox="0 0 200 38">
@@ -1286,8 +1316,8 @@
                         <text x="100" y="32" text-anchor="middle" font-size="10.5" fill="var(--success)" font-family="var(--font-main)" font-weight="600" opacity="0.9">Tümü tamamlandı ✓</text>
                     </svg>
                 </div>` : '';
-                list.innerHTML = celebrateHTML + todos.map(t => `
-                    <div class="todo-item ${t.done ? 'done' : ''}" data-id="${t.id}" onclick="toggleTodo(${t.id})">
+                list.innerHTML = celebrateHTML + sorted.map(t => `
+                    <div class="todo-item ${t.done ? 'done' : ''} priority-${t.priority || 'medium'}" data-id="${t.id}" onclick="toggleTodo(${t.id})">
                         <div class="todo-checkbox"></div>
                         <span class="todo-text">${escapeHtml(t.text)}</span>
                         <button class="todo-delete" onclick="event.stopPropagation();deleteTodo(${t.id})">✕</button>
@@ -1312,10 +1342,10 @@
             const text = input.value.trim();
             if (!text) return;
             const id = nextId(appData.todos || []);
-            appData.todos = [...(appData.todos || []), { id, text, done: false }];
+            appData.todos = [...(appData.todos || []), { id, text, done: false, priority: currentPriority }];
             input.value = '';
             renderTodos();
-            bgSave('/api/todos', 'POST', { text });
+            bgSave('/api/todos', 'POST', { text, priority: currentPriority });
         }
 
         function toggleTodo(id) {

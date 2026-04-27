@@ -313,6 +313,33 @@ def logout():
     return redirect(url_for('login'))
 
 
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    error = None
+    success = None
+    if request.method == 'POST':
+        current_pw = request.form.get('current_password', '')
+        new_pw     = request.form.get('new_password', '')
+        confirm_pw = request.form.get('confirm_password', '')
+        if len(new_pw) < 6:
+            error = 'Yeni şifre en az 6 karakter olmalı.'
+        elif new_pw != confirm_pw:
+            error = 'Yeni şifreler eşleşmiyor.'
+        else:
+            with Db() as db:
+                row = db.execute('SELECT password_hash FROM users WHERE id = ?', (current_user.id,)).fetchone()
+            if not row or not check_password_hash(row['password_hash'], current_pw):
+                error = 'Mevcut şifre hatalı.'
+            else:
+                with Db() as db:
+                    db.execute('UPDATE users SET password_hash = ? WHERE id = ?',
+                               (generate_password_hash(new_pw), current_user.id))
+                    db.commit()
+                success = 'Şifre başarıyla değiştirildi.'
+    return render_template('change_password.html', error=error, success=success)
+
+
 # ── Main page ──────────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -337,9 +364,12 @@ def add_todo():
     if not body or not body.get('text', '').strip():
         return jsonify({'error': 'Görev metni boş olamaz.'}), 400
     text = body['text'].strip()
+    priority = body.get('priority', 'medium')
+    if priority not in ('low', 'medium', 'high'):
+        priority = 'medium'
     def _add(data):
         new_id = max((t['id'] for t in data['todos']), default=0) + 1
-        data['todos'].append({'id': new_id, 'text': text, 'done': False})
+        data['todos'].append({'id': new_id, 'text': text, 'done': False, 'priority': priority})
     data = atomic_update(_add)
     return jsonify(data['todos'])
 
@@ -353,6 +383,22 @@ def toggle_todo(todo_id):
                 t['done'] = not t['done']
                 break
     data = atomic_update(_toggle)
+    return jsonify(data['todos'])
+
+
+@app.route('/api/todos/<int:todo_id>/priority', methods=['POST'])
+@login_required
+def update_todo_priority(todo_id):
+    body = request.get_json(silent=True)
+    priority = (body or {}).get('priority', 'medium')
+    if priority not in ('low', 'medium', 'high'):
+        return jsonify({'error': 'Geçersiz öncelik.'}), 400
+    def _update(data):
+        for t in data.get('todos', []):
+            if t['id'] == todo_id:
+                t['priority'] = priority
+                break
+    data = atomic_update(_update)
     return jsonify(data['todos'])
 
 
