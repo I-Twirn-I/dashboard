@@ -172,10 +172,8 @@ def load_user(user_id):
 
 # ── Per-user data helpers ──────────────────────────────────────────────────────
 
-def load_data():
+def _parse_data(row):
     from datetime import date
-    with Db() as db:
-        row = db.execute('SELECT data FROM users WHERE id = ?', (current_user.id,)).fetchone()
     if row and row['data']:
         try:
             stored = json.loads(row['data'])
@@ -183,7 +181,6 @@ def load_data():
             merged.update(stored)
             if 'card_order' not in merged:
                 merged['card_order'] = DEFAULT_CARD_ORDER[:]
-            # Geçmiş aylara ait takvim notlarını temizle
             if merged.get('calendar_notes'):
                 today = date.today()
                 current_month = (today.year, today.month)
@@ -197,11 +194,32 @@ def load_data():
     return dict(DEFAULT_DATA)
 
 
+def load_data():
+    with Db() as db:
+        row = db.execute('SELECT data FROM users WHERE id = ?', (current_user.id,)).fetchone()
+    return _parse_data(row)
+
+
 def save_data(data):
     with Db() as db:
         db.execute('UPDATE users SET data = ? WHERE id = ?',
                    (json.dumps(data, ensure_ascii=False), current_user.id))
         db.commit()
+
+
+def atomic_update(modifier):
+    """Race condition'ı önlemek için SELECT FOR UPDATE ile atomik güncelleme."""
+    with Db() as db:
+        if USE_PG:
+            row = db.execute('SELECT data FROM users WHERE id = ? FOR UPDATE', (current_user.id,)).fetchone()
+        else:
+            row = db.execute('SELECT data FROM users WHERE id = ?', (current_user.id,)).fetchone()
+        data = _parse_data(row)
+        modifier(data)
+        db.execute('UPDATE users SET data = ? WHERE id = ?',
+                   (json.dumps(data, ensure_ascii=False), current_user.id))
+        db.commit()
+    return data
 
 
 def get_spotify_tokens():
@@ -318,31 +336,32 @@ def add_todo():
     body = request.get_json(silent=True)
     if not body or not body.get('text', '').strip():
         return jsonify({'error': 'Görev metni boş olamaz.'}), 400
-    data = load_data()
-    new_id = max((t['id'] for t in data['todos']), default=0) + 1
-    data['todos'].append({'id': new_id, 'text': body['text'].strip(), 'done': False})
-    save_data(data)
+    text = body['text'].strip()
+    def _add(data):
+        new_id = max((t['id'] for t in data['todos']), default=0) + 1
+        data['todos'].append({'id': new_id, 'text': text, 'done': False})
+    data = atomic_update(_add)
     return jsonify(data['todos'])
 
 
 @app.route('/api/todos/<int:todo_id>/toggle', methods=['POST'])
 @login_required
 def toggle_todo(todo_id):
-    data = load_data()
-    for t in data['todos']:
-        if t['id'] == todo_id:
-            t['done'] = not t['done']
-            break
-    save_data(data)
+    def _toggle(data):
+        for t in data['todos']:
+            if t['id'] == todo_id:
+                t['done'] = not t['done']
+                break
+    data = atomic_update(_toggle)
     return jsonify(data['todos'])
 
 
 @app.route('/api/todos/<int:todo_id>', methods=['DELETE'])
 @login_required
 def delete_todo(todo_id):
-    data = load_data()
-    data['todos'] = [t for t in data['todos'] if t['id'] != todo_id]
-    save_data(data)
+    def _delete(data):
+        data['todos'] = [t for t in data['todos'] if t['id'] != todo_id]
+    data = atomic_update(_delete)
     return jsonify(data['todos'])
 
 
@@ -353,9 +372,8 @@ def save_notes():
     body = request.get_json(silent=True)
     if body is None:
         return jsonify({'error': 'Geçersiz istek.'}), 400
-    data = load_data()
-    data['notes'] = body.get('notes', '')
-    save_data(data)
+    notes = body.get('notes', '')
+    atomic_update(lambda data: data.update({'notes': notes}))
     return jsonify({'ok': True})
 
 
@@ -366,28 +384,28 @@ def add_bookmark():
     body = request.get_json(silent=True)
     if not body or not body.get('name') or not body.get('url'):
         return jsonify({'error': 'İsim ve URL zorunludur.'}), 400
-    data = load_data()
-    data['bookmarks'].append(body)
-    save_data(data)
+    def _add(data):
+        data['bookmarks'].append(body)
+    data = atomic_update(_add)
     return jsonify(data['bookmarks'])
 
 
 @app.route('/api/bookmarks/<int:index>', methods=['DELETE'])
 @login_required
 def delete_bookmark(index):
-    data = load_data()
-    if 0 <= index < len(data['bookmarks']):
-        data['bookmarks'].pop(index)
-    save_data(data)
+    def _delete(data):
+        if 0 <= index < len(data['bookmarks']):
+            data['bookmarks'].pop(index)
+    data = atomic_update(_delete)
     return jsonify(data['bookmarks'])
 
 
 @app.route('/api/theme', methods=['POST'])
 @login_required
 def toggle_theme():
-    data = load_data()
-    data['theme'] = 'light' if data['theme'] == 'dark' else 'dark'
-    save_data(data)
+    def _toggle(data):
+        data['theme'] = 'light' if data['theme'] == 'dark' else 'dark'
+    data = atomic_update(_toggle)
     return jsonify({'theme': data['theme']})
 
 
@@ -397,9 +415,8 @@ def update_city():
     body = request.get_json(silent=True)
     if not body or not body.get('city', '').strip():
         return jsonify({'error': 'Şehir adı boş olamaz.'}), 400
-    data = load_data()
-    data['city'] = body['city'].strip()
-    save_data(data)
+    city = body['city'].strip()
+    atomic_update(lambda data: data.update({'city': city}))
     return jsonify({'ok': True})
 
 
@@ -409,9 +426,8 @@ def save_card_order():
     body = request.get_json(silent=True)
     if not body or not isinstance(body.get('order'), list):
         return jsonify({'error': 'Geçersiz sıralama.'}), 400
-    data = load_data()
-    data['card_order'] = body['order']
-    save_data(data)
+    order = body['order']
+    atomic_update(lambda data: data.update({'card_order': order}))
     return jsonify({'ok': True})
 
 
@@ -424,39 +440,39 @@ def add_reminder():
     body = request.get_json(silent=True)
     if not body or not body.get('title', '').strip() or not body.get('time', '').strip():
         return jsonify({'error': 'Başlık ve saat zorunludur.'}), 400
-    data = load_data()
-    if 'reminders' not in data:
-        data['reminders'] = []
-    new_id = max((r['id'] for r in data['reminders']), default=0) + 1
-    data['reminders'].append({
-        'id': new_id,
-        'title': body['title'].strip(),
-        'time': body['time'].strip(),
-        'repeat': body.get('repeat', 'daily'),
-        'active': True,
-    })
-    save_data(data)
+    def _add(data):
+        if 'reminders' not in data:
+            data['reminders'] = []
+        new_id = max((r['id'] for r in data['reminders']), default=0) + 1
+        data['reminders'].append({
+            'id': new_id,
+            'title': body['title'].strip(),
+            'time': body['time'].strip(),
+            'repeat': body.get('repeat', 'daily'),
+            'active': True,
+        })
+    data = atomic_update(_add)
     return jsonify(data['reminders'])
 
 
 @app.route('/api/reminders/<int:reminder_id>', methods=['DELETE'])
 @login_required
 def delete_reminder(reminder_id):
-    data = load_data()
-    data['reminders'] = [r for r in data.get('reminders', []) if r['id'] != reminder_id]
-    save_data(data)
+    def _delete(data):
+        data['reminders'] = [r for r in data.get('reminders', []) if r['id'] != reminder_id]
+    data = atomic_update(_delete)
     return jsonify(data['reminders'])
 
 
 @app.route('/api/reminders/<int:reminder_id>/toggle', methods=['POST'])
 @login_required
 def toggle_reminder(reminder_id):
-    data = load_data()
-    for r in data.get('reminders', []):
-        if r['id'] == reminder_id:
-            r['active'] = not r.get('active', True)
-            break
-    save_data(data)
+    def _toggle(data):
+        for r in data.get('reminders', []):
+            if r['id'] == reminder_id:
+                r['active'] = not r.get('active', True)
+                break
+    data = atomic_update(_toggle)
     return jsonify(data['reminders'])
 
 
@@ -469,26 +485,26 @@ def add_habit():
     body = request.get_json(silent=True)
     if not body or not body.get('name', '').strip():
         return jsonify({'error': 'Alışkanlık adı zorunludur.'}), 400
-    data = load_data()
-    if 'habits' not in data:
-        data['habits'] = []
-    new_id = max((h['id'] for h in data['habits']), default=0) + 1
-    data['habits'].append({
-        'id': new_id,
-        'name': body['name'].strip(),
-        'emoji': body.get('emoji', '✅'),
-        'checks': {},
-    })
-    save_data(data)
+    def _add(data):
+        if 'habits' not in data:
+            data['habits'] = []
+        new_id = max((h['id'] for h in data['habits']), default=0) + 1
+        data['habits'].append({
+            'id': new_id,
+            'name': body['name'].strip(),
+            'emoji': body.get('emoji', '✅'),
+            'checks': {},
+        })
+    data = atomic_update(_add)
     return jsonify(data['habits'])
 
 
 @app.route('/api/habits/<int:habit_id>', methods=['DELETE'])
 @login_required
 def delete_habit(habit_id):
-    data = load_data()
-    data['habits'] = [h for h in data.get('habits', []) if h['id'] != habit_id]
-    save_data(data)
+    def _delete(data):
+        data['habits'] = [h for h in data.get('habits', []) if h['id'] != habit_id]
+    data = atomic_update(_delete)
     return jsonify(data['habits'])
 
 
@@ -497,17 +513,17 @@ def delete_habit(habit_id):
 def check_habit(habit_id):
     from datetime import date
     today = date.today().isoformat()
-    data = load_data()
-    for h in data.get('habits', []):
-        if h['id'] == habit_id:
-            if 'checks' not in h:
-                h['checks'] = {}
-            if h['checks'].get(today):
-                del h['checks'][today]
-            else:
-                h['checks'][today] = True
-            break
-    save_data(data)
+    def _check(data):
+        for h in data.get('habits', []):
+            if h['id'] == habit_id:
+                if 'checks' not in h:
+                    h['checks'] = {}
+                if h['checks'].get(today):
+                    del h['checks'][today]
+                else:
+                    h['checks'][today] = True
+                break
+    data = atomic_update(_check)
     return jsonify(data['habits'])
 
 
@@ -520,16 +536,16 @@ def save_calendar_note():
     body = request.get_json(silent=True)
     if not body or 'date' not in body:
         return jsonify({'error': 'Tarih zorunludur.'}), 400
-    date_str = body['date'].strip()   # "YYYY-MM-DD"
+    date_str = body['date'].strip()
     note_text = body.get('note', '').strip()
-    data = load_data()
-    if 'calendar_notes' not in data:
-        data['calendar_notes'] = {}
-    if note_text:
-        data['calendar_notes'][date_str] = note_text
-    else:
-        data['calendar_notes'].pop(date_str, None)
-    save_data(data)
+    def _save(data):
+        if 'calendar_notes' not in data:
+            data['calendar_notes'] = {}
+        if note_text:
+            data['calendar_notes'][date_str] = note_text
+        else:
+            data['calendar_notes'].pop(date_str, None)
+    data = atomic_update(_save)
     return jsonify(data['calendar_notes'])
 
 
